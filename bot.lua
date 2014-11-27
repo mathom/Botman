@@ -26,7 +26,7 @@ commands.h_help='Print this help message.'
 function commands.c_help(user, args)
     local names = {}
     for name, _ in pairs(commands) do
-        if name:sub(0,1) == 'c' then
+        if name:sub(0,2) == 'c_' then
             local base = name:match('c_(.+)')
             local help = commands['h_' .. base]
             table.insert(names, '<b>!' .. base .. '</b> ' .. help)

@@ -13,7 +13,7 @@ Install the required command line tools:
 
 You can also compile [SAM](https://github.com/s-macke/SAM) if you like.
 
-You can import some sounds for the soundboard function with the included `convert.sh` script.
+Sounds for the soundboard function can be imported with the included `convert.sh` script.
 
 Usage
 -----

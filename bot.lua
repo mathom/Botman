@@ -20,7 +20,7 @@ function piepan.onMessage(msg)
     for word in rest:gmatch("[%w%p]+") do table.insert(args, word) end
 
     if commands['c_' .. command] then
-        join_channel()
+        -- join_channel()
         commands['c_' .. command](msg.user, args)
     end
 end
@@ -95,7 +95,8 @@ function commands.c_say(user, args)
 
     local input = '/tmp/say.wav'
     os.remove(input)
-    local message = table.concat(args, ' '):gsub('["\\$]','')
+    local message = table.concat(args, ' '):gsub('[^a-zA-Z0-9 ]','\\%1')
+    print('User ' .. user.name .. ' is saying ' .. message)
     command = 'espeak ' .. cargs .. ' -w ' .. input .. ' "' .. message .. '"'
     rval, rtype = os.execute(command)
 
@@ -119,12 +120,13 @@ end
 
 commands.h_playlist='List files available to !play.'
 function commands.c_playlist(user, args)
-    local ls = io.popen('ls -1 sounds')
+    local ls = io.popen('ls -sh1 sounds')
 
     local files = {}
     local file = ls:read()
     while file ~= nil do
-        table.insert(files, file:match('^([^.]+)'))
+        local size, name = file:match('([^.]+) ([^.]+)')
+        table.insert(files, '<b>' .. name .. '</b> - ' .. size)
         file = ls:read()
     end
 

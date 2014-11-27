@@ -79,25 +79,52 @@ end
 commands.h_say='Speak your message aloud.'
 function commands.c_say(user, args)
     local cargs = ''
+    local mode = 'espeak'
+    local pitch_flag = ' -p '
+    local speed_flag = ' -s '
+
+    if args[1] == 'c64' then
+        mode = 'sam'
+        pitch_flag = ' -pitch '
+        speed_flag = ' -speed '
+        table.remove(args, 1)
+    end
+
     local sargs = args[1]
     local pitch = sargs:match('p(%d+)')
     if pitch ~= nil then
-        cargs = cargs .. ' -p ' .. pitch
+        cargs = cargs .. pitch_flag .. pitch
     end
     local speed = sargs:match('s(%d+)')
     if speed ~= nil then
-        cargs = cargs .. ' -s ' .. speed
+        cargs = cargs .. speed_flag .. speed
+    end
+    local variant = sargs:match('v\'(.+)\'')
+    if variant ~= nil then
+        cargs = cargs .. ' -v ' .. variant
+    end
+    local throat = sargs:match('t(%d+)')
+    if variant ~= nil then
+        cargs = cargs .. ' -throat ' .. throat
+    end
+    local mouth = sargs:match('m(%d+)')
+    if variant ~= nil then
+        cargs = cargs .. ' -mouth ' .. mouth
     end
 
-    if speed ~= nil or pitch ~= nil then
+    if cargs ~= '' then
         table.remove(args, 1)
     end
 
     local input = '/tmp/say.wav'
     os.remove(input)
-    local message = table.concat(args, ' '):gsub('[^a-zA-Z0-9 ]','\\%1')
+    local message = table.concat(args, ' '):gsub('[^a-zA-Z0-9,\'!. ]','\\%1')
     print('User ' .. user.name .. ' is saying ' .. message)
-    command = 'espeak ' .. cargs .. ' -w ' .. input .. ' "' .. message .. '"'
+    if mode == 'espeak' then
+        command = 'espeak ' .. cargs .. ' -w ' .. input .. ' "' .. message .. '"'
+    elseif mode == 'sam' then
+        command = 'sam ' .. cargs .. ' -wav ' .. input .. ' "' .. message .. '"'
+    end
     rval, rtype = os.execute(command)
 
     if rtype ~= 'exit' or not rval then

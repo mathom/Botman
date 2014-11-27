@@ -1,6 +1,10 @@
-function piepan.onConnect()
+function join_channel()
     local cool_dudes = piepan.channels("Cool Dudes Only")
     piepan.me:moveTo(cool_dudes)
+end
+
+function piepan.onConnect()
+    join_channel()
 end
 
 function piepan.onMessage(msg)
@@ -16,6 +20,7 @@ function piepan.onMessage(msg)
     for word in rest:gmatch("[%w%p]+") do table.insert(args, word) end
 
     if commands['c_' .. command] then
+        join_channel()
         commands['c_' .. command](msg.user, args)
     end
 end
@@ -73,9 +78,25 @@ end
 
 commands.h_say='Speak your message aloud.'
 function commands.c_say(user, args)
+    local cargs = ''
+    local sargs = args[1]
+    local pitch = sargs:match('p(%d+)')
+    if pitch ~= nil then
+        cargs = cargs .. ' -p ' .. pitch
+    end
+    local speed = sargs:match('s(%d+)')
+    if speed ~= nil then
+        cargs = cargs .. ' -s ' .. speed
+    end
+
+    if speed ~= nil or pitch ~= nil then
+        table.remove(args, 1)
+    end
+
     local input = '/tmp/say.wav'
     os.remove(input)
-    command = 'espeak -w ' .. input .. ' "' .. table.concat(args, ' ') .. '"'
+    local message = table.concat(args, ' '):gsub('["\\$]','')
+    command = 'espeak ' .. cargs .. ' -w ' .. input .. ' "' .. message .. '"'
     rval, rtype = os.execute(command)
 
     if rtype ~= 'exit' or not rval then

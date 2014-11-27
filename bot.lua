@@ -15,20 +15,40 @@ function piepan.onMessage(msg)
     local args = {}
     for word in rest:gmatch("[%w%p]+") do table.insert(args, word) end
 
-    if     command == 'echo' then c_echo(msg.user, args)
-    elseif command == 'say'  then c_say(msg.user, args)
-    elseif command == 'play' then c_play(msg.user, args)
-    elseif command == 'stop' then piepan.Audio:stop()
-    elseif command == 'playlist' then c_playlist(msg.user, args)
-    elseif command == 'ytplay' then c_ytplay(msg.user, args)
+    if commands['c_' .. command] then
+        commands['c_' .. command](msg.user, args)
     end
 end
 
-function c_echo(user, args)
-    piepan.me.channel:send(table.concat(args, ' '))
+commands = {}
+
+commands.h_help='Print this help message.'
+function commands.c_help(user, args)
+    local names = {}
+    for name, _ in pairs(commands) do
+        if name:sub(0,1) == 'c' then
+            local base = name:match('c_(.+)')
+            local help = commands['h_' .. base]
+            table.insert(names, '<b>!' .. base .. '</b> ' .. help)
+        end
+    end
+
+    table.sort(names)
+    user:send('Available commands:<br/>' .. table.concat(names, '<br/>'))
 end
 
-function c_play(user, args)
+commands.h_stop='Stop playing sound.'
+function commands.c_stop(user, args)
+    piepan.Audio:stop()
+end
+
+commands.h_echo='Repeat what you just said.'
+function commands.c_echo(user, args)
+    user:send(table.concat(args, ' '))
+end
+
+commands.h_play='Play a supported soundfile. See !playlist.'
+function commands.c_play(user, args)
     local volume = 1.0
 
     if args[2] ~= nil then
@@ -51,7 +71,8 @@ function play_soundfile(file, volume, user)
     end
 end
 
-function c_say(user, args)
+commands.h_say='Speak your message aloud.'
+function commands.c_say(user, args)
     local input = '/tmp/say.wav'
     os.remove(input)
     command = 'espeak -w ' .. input .. ' "' .. table.concat(args, ' ') .. '"'
@@ -75,7 +96,8 @@ function c_say(user, args)
     play_soundfile(out, 1.0, user)
 end
 
-function c_playlist(user, args)
+commands.h_playlist='List files available to !play.'
+function commands.c_playlist(user, args)
     local ls = io.popen('ls -1 sounds')
 
     local files = {}
@@ -88,7 +110,8 @@ function c_playlist(user, args)
     user:send('Sound files:<br/>' .. table.concat(files, '<br/>'))
 end
 
-function c_ytplay(user, args)
+commands.h_ytplay='Download and play the audio from Youtube (supply video ID only).'
+function commands.c_ytplay(user, args)
     local yt = '/tmp/ytdl'
     os.remove(yt .. '.m4a')
     local command = 'youtube-dl --socket-timeout 15 -x https://www.youtube.com/watch?v=' .. args[1] .. ' -o "' .. yt .. '.%(ext)s"'

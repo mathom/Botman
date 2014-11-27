@@ -112,9 +112,26 @@ end
 
 commands.h_ytplay='Download and play the audio from Youtube (supply video ID only).'
 function commands.c_ytplay(user, args)
+    local volume = 1.0
+
+    if args[2] ~= nil then
+        volume = tonumber(args[2])
+    end
+
+    local output = download_youtube(args[1], user)
+
+    if output == nil then
+        return
+    end
+
+    play_soundfile(output, volume, user)
+end
+
+function download_youtube(hash, user)
+    print('User ' .. user.name .. ' is downloading ' .. hash)
     local yt = '/tmp/ytdl'
     os.remove(yt .. '.m4a')
-    local command = 'youtube-dl --socket-timeout 15 -x https://www.youtube.com/watch?v=' .. args[1] .. ' -o "' .. yt .. '.%(ext)s"'
+    local command = 'youtube-dl --socket-timeout 15 -x https://www.youtube.com/watch?v=' .. hash .. ' -o "' .. yt .. '.%(ext)s"'
     local rval, rtype = os.execute(command)
 
     if rtype ~= 'exit' or not rval then
@@ -134,11 +151,19 @@ function commands.c_ytplay(user, args)
         return
     end
 
-    local volume = 1.0
+    return out
+end
 
-    if args[2] ~= nil then
-        volume = tonumber(args[2])
+commands.h_ytsave='Download and save a Youtube (video ID) with a name.'
+function commands.c_ytsave(user, args)
+    local output = download_youtube(args[1], user)
+
+    if output == nil then
+        return
     end
 
-    play_soundfile(out, volume, user)
+    local name = args[2]:match('(%w+)')
+
+    os.rename(output, 'sounds/' .. name .. '.ogg')
+    user:send('Saved new sound to ' .. name)
 end

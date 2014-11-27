@@ -1,3 +1,6 @@
+commands = {}
+responses = {}
+
 function join_channel()
     if piepan.args['channel'] ~= nil then
         print('Joining channel ' .. piepan.args['channel'][1])
@@ -6,7 +9,39 @@ function join_channel()
     end
 end
 
+function load_responses()
+    if piepan.args.responses ~= nil then
+        for _,file in ipairs(piepan.args.responses) do
+            print('Loading ' .. file)
+            local loaded, err = loadfile(file)
+            if not loaded then
+                error('Cannot load ' .. file .. ' : ' .. err)
+            else
+                local new = loaded()
+                local count = 0
+                for key,val in pairs(new) do
+                    responses[key] = val
+                    count = count + 1
+                end
+            end
+        end
+    end
+end
+
+has_seen_user = {}
+
+function piepan.onUserChange(event)
+    local my_channel = piepan.me.channel.id
+    if event.isChangedChannel and event.user.channel.id == my_channel then
+        if not has_seen_user[event.user.id] then
+            commands.c_say(event.user, {'hello, ' .. event.user.name .. '!'})
+            has_seen_user[event.user.id] = true
+        end
+    end
+end
+
 function piepan.onConnect()
+    load_responses()
     join_channel()
 end
 
@@ -14,6 +49,13 @@ function piepan.onMessage(msg)
     if msg.user == nil then
         return
     end
+
+    for response, func in pairs(responses) do
+        if msg.text:match(response) then
+            func(msg, commands)
+        end
+    end
+
     local command, rest = msg.text:match('^!(%w+) ?(.*)$')
     if command == nil then
         return
@@ -27,8 +69,6 @@ function piepan.onMessage(msg)
         commands['c_' .. command](msg.user, args)
     end
 end
-
-commands = {}
 
 commands.h_help='Print this help message.'
 function commands.c_help(user, args)
@@ -121,7 +161,7 @@ function commands.c_say(user, args)
 
     local input = '/tmp/say.wav'
     os.remove(input)
-    local message = table.concat(args, ' '):gsub('[^a-zA-Z0-9,\'-!. ]','\\%1')
+    local message = table.concat(args, ' '):gsub('[^a-zA-Z0-9,\'-\\!. ]','\\%1')
     print('User ' .. user.name .. ' is saying ' .. message)
     if mode == 'espeak' then
         command = 'espeak ' .. cargs .. ' -w ' .. input .. ' "' .. message .. '"'

@@ -1,6 +1,9 @@
 function join_channel()
-    local cool_dudes = piepan.channels("Cool Dudes Only")
-    piepan.me:moveTo(cool_dudes)
+    if piepan.args['channel'] ~= nil then
+        print('Joining channel ' .. piepan.args['channel'][1])
+        local home_channel = piepan.channels(piepan.args['channel'])
+        piepan.me:moveTo(home_dudes)
+    end
 end
 
 function piepan.onConnect()

@@ -106,7 +106,7 @@ def read_stats(dire, radiant, winner, playermap, debug):
     diff_sums = {k:max(abs(p[k]) for p in player_diffs) for k in keys}
     for p in player_diffs:
         for k in keys:
-            p[k] /= diff_sums[k]
+            p[k] /= max(diff_sums[k],1)
 
     stats['player_diffs'] = player_diffs
     if debug:
@@ -122,25 +122,26 @@ def read_stats(dire, radiant, winner, playermap, debug):
     }
     for i, diffs in enumerate(player_diffs):
         player = player_team[i]
-        score = abs(diffs['tower damage'] / diffs['hero damage'])
-        #print player['name'], diffs['tower damage'], diffs['hero damage'], score
+        score = diffs['tower damage'] / diffs['hero damage']
         if roles['pusher'][0] < score:
             roles['pusher'] = (score, player)
 
-        score = abs(diffs['last hits'] / diffs['hero damage'])
+        score = diffs['last hits'] / diffs['hero damage']
         if roles['farmer'][0] < score:
             roles['farmer'] = (score, player)
 
-        score = abs(diffs['hero damage'] / diffs['tower damage'])
+        score = diffs['kda'] / diffs['tower damage']
+        if debug:
+            print player['name'], diffs['kda'], diffs['tower damage'], score
         if roles['ganker'][0] < score:
             roles['ganker'] = (score, player)
 
 
-        score = abs(1-diffs['kda'])
+        score = 1-diffs['kda']
         if roles['feeder'][0] < score:
             roles['feeder'] = (score, player)
 
-        score = (diffs['kda'] + diffs['hero damage'])
+        score = (diffs['kda'] + diffs['hero damage'])/2
         if roles['carry'][0] < score:
             roles['carry'] = (score, player)
 

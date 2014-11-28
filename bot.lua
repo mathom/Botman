@@ -33,9 +33,9 @@ has_seen_user = {}
 function piepan.onUserChange(event)
     local my_channel = piepan.me.channel.id
     if event.isChangedChannel and event.user.channel.id == my_channel then
-        if not has_seen_user[event.user.id] then
+        if not has_seen_user[event.user.userId] then
             commands.c_say(event.user, {'hello, ' .. event.user.name .. '!'})
-            has_seen_user[event.user.id] = true
+            has_seen_user[event.user.userId] = true
         end
     end
 end

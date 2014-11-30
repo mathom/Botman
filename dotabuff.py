@@ -45,6 +45,14 @@ TEAM_RATIOS = ['xpm', 'gpm', 'tower damage', 'hero damage']
 KDASCALE = 1.0/4
 TDSCALE = 0.5
 
+ROLES = {
+        'farmer': {'last hits':1, 'hero damage':-1},
+        'ganker': {'kda':1, 'tower damage':-1},
+        'carry': {'kda':1,'xpm':1,'gpm':1},
+        'feeder': {'kda':-1},
+        'pusher': {'tower damage':1, 'hero damage':-1},
+        }
+
 def read_stats(dire, radiant, winner, playermap, debug):
     stats = {}
     dota_to_mumble = {v:k for k,v in playermap.items()}
@@ -96,8 +104,6 @@ def read_stats(dire, radiant, winner, playermap, debug):
     stats['worst_kda'] = worst_kda
     stats['worst_kd'] = worst_kd
 
-    stats['carry'] = None
-
     player_means = {k: v/5.0 for k,v in stats['dire_sums'].items()}
     player_diffs = []
     for player in player_team:
@@ -113,45 +119,24 @@ def read_stats(dire, radiant, winner, playermap, debug):
         print 'means', player_means
         pprint.pprint({player_team[i]['name']:d for i,d in enumerate(player_diffs)})
 
-    roles = {
-        'farmer': (-1, None),
-        'carry': (-1, None),
-        'feeder': (-1, None),
-        'ganker': (-1, None),
-        'pusher': (-1, None)
-    }
     for i, diffs in enumerate(player_diffs):
         player = player_team[i]
-        score = diffs['tower damage'] / diffs['hero damage']
-        if roles['pusher'][0] < score:
-            roles['pusher'] = (score, player)
 
-        score = diffs['last hits'] / diffs['hero damage']
-        if roles['farmer'][0] < score:
-            roles['farmer'] = (score, player)
+        player['roles'] = {}
+        for role, scoring in ROLES.items():
+            count = 0
+            score = 0
+            for k,v in scoring.items():
+                score += diffs[k] * v
+                count += 1
+            player['roles'][role] = score / float(count)
 
-        score = diffs['kda'] / diffs['tower damage']
+    roles = []
+    for player in player_team:
         if debug:
-            print player['name'], diffs['kda'], diffs['tower damage'], score
-        if roles['ganker'][0] < score:
-            roles['ganker'] = (score, player)
-
-
-        score = 1-diffs['kda']
-        if roles['feeder'][0] < score:
-            roles['feeder'] = (score, player)
-
-        score = (diffs['kda'] + diffs['hero damage'])/2
-        if roles['carry'][0] < score:
-            roles['carry'] = (score, player)
-
-    roles = {k:v for k,v in roles.items() if v[1]}
-    if debug:
-        print {k:(v[0], v[1]['name']) for k,v in roles.items()}
-    # just the top 3
-    roles = {k:v for k,v in sorted(roles.items(), key=lambda x: x[1][1])[-3:]}
-    stats['roles'] = roles
-
+            print player['name'], player['roles']
+        roles.extend([(role, value, player) for role,value in player['roles'].items()])
+    stats['top_roles'] = sorted(roles, key=lambda x:x[1])[-3:]
 
     for stat in TEAM_RATIOS:
         stats[stat+'_ratio'] = player_sums[stat] / max(other_sums[stat], 1)
@@ -202,33 +187,33 @@ def make_commentary(stats, playermap, debug):
     if stats['win']:
         commentary.append((0.2, 'Wow, you won?'))
 
-        for role, data in stats['roles'].items():
-            name = get_name(data[1])
+        for role, score, player in stats['top_roles']:
+            name = get_name(player)
             if role == 'carry':
-                commentary.append((data[0], '{0} carried the team.'.format(name)))
+                commentary.append((score, '{0} carried the team.'.format(name)))
             if role == 'feeder':
-                commentary.append((data[0], '{0}\'s feeding didn\'t exactly help.'.format(name)))
+                commentary.append((score, '{0}\'s feeding didn\'t exactly help.'.format(name)))
             if role == 'ganker':
-                commentary.append((data[0], '{0} just ganked the entire time.'.format(name)))
+                commentary.append((score, '{0} just ganked the entire time.'.format(name)))
             if role == 'farmer':
-                commentary.append((data[0], '{0} just farmed all game.'.format(name)))
+                commentary.append((score, '{0} just farmed all game.'.format(name)))
             if role == 'pusher':
-                commentary.append((data[0], '{0} pushed all their towers in.'.format(name)))
+                commentary.append((score, '{0} pushed all their towers in.'.format(name)))
     else:
         commentary.append((0.2, 'You lost!'))
 
-        for role, data in stats['roles'].items():
-            name = get_name(data[1])
+        for role, score, player in stats['top_roles']:
+            name = get_name(player)
             if role == 'carry':
-                commentary.append((data[0], '{0} carried you losers.'.format(name)))
+                commentary.append((score, '{0} carried you losers.'.format(name)))
             if role == 'feeder':
-                commentary.append((data[0], '{0} fed really hard.'.format(name)))
+                commentary.append((score, '{0} fed really hard.'.format(name)))
             if role == 'ganker':
-                commentary.append((data[0], '{0} just ganked the entire time.'.format(name)))
+                commentary.append((score, '{0} just ganked the entire time.'.format(name)))
             if role == 'farmer':
-                commentary.append((data[0], '{0} didn\'t notice the loss because they were too busy farming.'.format(name)))
+                commentary.append((score, '{0} didn\'t notice the loss because they were too busy farming.'.format(name)))
             if role == 'pusher':
-                commentary.append((data[0], '{0} wasted the whole game trying to push.'.format(name)))
+                commentary.append((score, '{0} wasted the whole game trying to push.'.format(name)))
 
     return commentary
 

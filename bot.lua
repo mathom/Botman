@@ -68,7 +68,7 @@ function piepan.onMessage(msg)
     local args = {}
     for word in rest:gmatch("[%w%p]+") do table.insert(args, word) end
 
-    if command == 's' then
+    if command == 's' or command == '@' then
         command = 'stop'
     end
 

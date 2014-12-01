@@ -261,6 +261,7 @@ function commands.c_ytplay(user, args)
         os.remove(output)
     end
 
+    user:send('Downloading and playing ' .. name)
     piepan.Thread.new(download_youtube, finish, {hash=args[1], user=user, ss=args[3], t=args[4]})
 end
 
@@ -333,6 +334,7 @@ end
 
 commands.h_ytsave='Download and save a Youtube (video ID) with a name.'
 function commands.c_ytsave(user, args)
+    user:send('Downloading ' .. name .. ' as ' .. args[2])
     function finish(output)
         if output == nil then
             return

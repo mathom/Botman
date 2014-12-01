@@ -261,8 +261,13 @@ function commands.c_ytplay(user, args)
         os.remove(output)
     end
 
-    user:send('Downloading and playing ' .. name)
+    user:send('Downloading and playing ' .. args[1])
     piepan.Thread.new(download_youtube, finish, {hash=args[1], user=user, ss=args[3], t=args[4]})
+end
+
+function file_exists(name)
+    local f=io.open(name,"r")
+    if f~=nil then io.close(f) return true else return false end
 end
 
 function download_youtube(data)
@@ -285,7 +290,11 @@ function download_youtube(data)
     print('User ' .. user.name .. ' running: ' .. command)
     local rval, rtype = os.execute(command)
 
-    yt = yt .. '.m4a'
+    if file_exists(yt .. '.ogg') then
+        yt = yt .. '.ogg'
+    else
+        yt = yt .. '.m4a'
+    end
 
     if rtype ~= 'exit' or not rval then
         user:send('Error downloading ' .. hash .. '!')
@@ -334,7 +343,7 @@ end
 
 commands.h_ytsave='Download and save a Youtube (video ID) with a name.'
 function commands.c_ytsave(user, args)
-    user:send('Downloading ' .. name .. ' as ' .. args[2])
+    user:send('Downloading ' .. args[1] .. ' as ' .. args[2])
     function finish(output)
         if output == nil then
             return

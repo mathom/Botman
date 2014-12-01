@@ -221,11 +221,26 @@ function commands.c_playlist(user, args)
     local file = ls:read()
     while file ~= nil do
         local size, name = file:match('([^.]+) ([^.]+)')
-        table.insert(files, '<b>' .. name .. '</b> - ' .. size)
+        if name ~= 'total' then
+            table.insert(files, '<b>' .. name .. '</b> - ' .. size)
+        end
         file = ls:read()
     end
 
-    user:send('Sound files:<br/>' .. table.concat(files, '<br/>'))
+    local lines = {}
+    local pages = 1
+    for _,line in ipairs(files) do
+        table.insert(lines, line)
+        if #lines >= 50 then
+            user:send('Sound files (' .. pages .. '):<br/>' .. table.concat(lines, '<br/>'))
+            lines = {}
+            pages = pages + 1
+        end
+    end
+
+    if #lines > 0 then
+        user:send('Sound files (' .. pages .. '):<br/>' .. table.concat(lines, '<br/>'))
+    end
 end
 
 commands.h_ytplay='Download and play the audio from Youtube (supply video ID only).'

@@ -68,6 +68,10 @@ function piepan.onMessage(msg)
     local args = {}
     for word in rest:gmatch("[%w%p]+") do table.insert(args, word) end
 
+    if command == 's' then
+        command = 'stop'
+    end
+
     if commands['c_' .. command] then
         -- join_channel()
         commands['c_' .. command](msg.user, args)

@@ -9,6 +9,7 @@ responses['dotabuff.com/matches/'] = function(message, commands)
     local comment = io.popen(command)
     local answer = comment:read('*all')
 
+    message.user.channel:send(answer)
     commands.c_say(message.user, {answer})
 end
 

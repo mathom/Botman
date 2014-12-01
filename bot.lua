@@ -101,7 +101,7 @@ end
 
 commands.h_play='Play a supported soundfile. See !playlist.'
 function commands.c_play(user, args)
-    local volume = 1.0
+    local volume = 0.5
 
     if args[2] ~= nil then
         volume = tonumber(args[2])
@@ -248,36 +248,70 @@ function commands.c_ytplay(user, args)
         volume = tonumber(args[2])
     end
 
-    local output = download_youtube(args[1], user)
+    function finish(output)
+        if output == nil then
+            return
+        end
 
-    if output == nil then
-        return
+        play_soundfile(output, volume, user)
+        os.remove(output)
     end
 
-    play_soundfile(output, volume, user)
+    piepan.Thread.new(download_youtube, finish, {hash=args[1], user=user, ss=args[3], t=args[4]})
 end
 
-function download_youtube(hash, user)
-    print('User ' .. user.name .. ' is downloading ' .. hash)
-    local yt = '/tmp/ytdl'
-    os.remove(yt .. '.m4a')
-    local command = 'youtube-dl --socket-timeout 15 -x https://www.youtube.com/watch?v=' .. hash .. ' -o "' .. yt .. '.%(ext)s"'
-    local rval, rtype = os.execute(command)
+function download_youtube(data)
+    local hash = data.hash:match('^([%d%a_-]+)$')
+    local user = data.user
+    local ss = data.ss:match('^(%d%d:%d%d:%d%d)$')
+    local t = data.t:match('^(%d%d:%d%d:%d%d)$')
 
-    if rtype ~= 'exit' or not rval then
-        user:send('Error downloading!')
-        return
-    end
+    print('User ' .. user.name .. ' is downloading ' .. hash)
+    local tmp = os.tmpname()
+    local yt = tmp
+    os.remove(tmp)
+    local command = 'youtube-dl --socket-timeout 10 -x https://www.youtube.com/watch?v=' .. hash .. ' -o "' .. yt .. '.%(ext)s"'
+    local rval, rtype = os.execute(command)
 
     yt = yt .. '.m4a'
 
-    local out = '/tmp/ytconv.ogg'
-    os.remove(out)
-    command = 'avconv -i ' .. yt .. ' -ac 1 -ar 48000 -codec:a libvorbis ' .. out
+    if rtype ~= 'exit' or not rval then
+        user:send('Error downloading ' .. hash .. '!')
+        os.remove(yt)
+        return
+    end
+    print('User ' .. user.name .. ' is converting ' .. yt)
+
+    local tmp = os.tmpname()
+    local out = tmp .. '.ogg'
+    os.remove(tmp)
+
+    local extra = ''
+    if ss then
+        extra = extra .. ' -ss ' .. ss
+    end
+
+    if t then
+        extra = extra .. ' -t ' .. ss
+    end
+
+    command = 'avconv -i ' .. yt .. ' -ac 1 -ar 48000 -codec:a libvorbis ' .. extra .. ' ' .. out
     rval, rtype = os.execute(command)
+    os.remove(yt)
 
     if rtype ~= 'exit' or not rval then
         user:send('Error converting audio!')
+        os.remove(out)
+        return
+    end
+
+    print('User ' .. user.name .. ' is normalizing ' .. out)
+    command = 'normalize-ogg ' .. out
+    rval, rtype = os.execute(command)
+
+    if rtype ~= 'exit' or not rval then
+        user:send('Error normalizing audio!')
+        os.remove(out)
         return
     end
 
@@ -286,14 +320,15 @@ end
 
 commands.h_ytsave='Download and save a Youtube (video ID) with a name.'
 function commands.c_ytsave(user, args)
-    local output = download_youtube(args[1], user)
+    function finish(output)
+        if output == nil then
+            return
+        end
 
-    if output == nil then
-        return
+        local name = args[2]:match('(%w+)')
+
+        os.rename(output, 'sounds/' .. name .. '.ogg')
+        user:send('Saved new sound to ' .. name)
     end
-
-    local name = args[2]:match('(%w+)')
-
-    os.rename(output, 'sounds/' .. name .. '.ogg')
-    user:send('Saved new sound to ' .. name)
+    piepan.Thread.new(download_youtube, finish, {hash=args[1], user=user, ss=args[3], t=args[4]})
 end

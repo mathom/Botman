@@ -1,5 +1,14 @@
 commands = {}
 responses = {}
+playlist = {}
+current = nil
+
+shortcuts = {
+  s = 'stop',
+  ql = 'queuelist',
+  qc = 'queueclear',
+  h = 'help'
+}
 
 function join_channel()
     if piepan.args['channel'] ~= nil then
@@ -56,10 +65,14 @@ function piepan.onMessage(msg)
         end
     end
 
-    local mode, command, rest = msg.text:match('^([!@])(%w+) ?(.*)$')
+    local mode, command, rest = msg.text:match('^([+!@])(%w+) ?(.*)$')
     if mode == '@' then
         rest = command .. ' ' .. rest
         command = 'play'
+    end
+    if mode == '+' then
+        rest = command .. ' ' .. rest
+        command = 'queue'
     end
     if command == nil then
         return
@@ -68,8 +81,8 @@ function piepan.onMessage(msg)
     local args = {}
     for word in rest:gmatch("[%w%p]+") do table.insert(args, word) end
 
-    if command == 's' then
-        command = 'stop'
+    if shortcuts[command] then
+        command = shortcuts[command]
     end
 
     if commands['c_' .. command] then
@@ -103,8 +116,9 @@ function commands.c_echo(user, args)
     user:send(table.concat(args, ' '))
 end
 
-commands.h_play='Play a supported soundfile. See !playlist.'
-function commands.c_play(user, args)
+commands.h_queue='Queue a sound to play. See !playlist and !play.'
+function commands.c_queue(user, args)
+
     local volume = 0.5
 
     if args[2] ~= nil then
@@ -112,7 +126,49 @@ function commands.c_play(user, args)
     end
 
     local filename = 'sounds/' .. args[1] .. '.ogg'
-    play_soundfile(filename, volume, user)
+
+    table.insert(playlist, 1, {user=user, volume=volume, filename=filename})
+
+    if not piepan.Audio:isPlaying() then
+        play_queue()
+    end
+end
+
+commands.h_queuelist='Display play queue. See !queue.'
+function commands.c_queuelist(user, args)
+    local lines = {}
+    for _,data in ipairs(playlist) do
+        table.insert(lines, data.filename:match('^sounds/(.+).ogg$'))
+    end
+    if current then
+        user:send('Currently playing: ' .. current)
+    end
+
+    if #lines > 0 then
+        user:send('Queued sounds:<br/>' .. table.concat(lines, '<br/>'))
+    else
+        user:send('Queue empty!')
+    end
+end
+
+commands.h_queueclear='Clear the play queue. See !queue.'
+function commands.c_queueclear(user, args)
+    playlist = {}
+    commands.c_stop(user, args)
+end
+
+commands.h_play='Play a supported soundfile. See !playlist.'
+function commands.c_play(user, args)
+    playlist = {}
+    commands.c_stop(user, args)
+    commands.c_queue(user, args)
+end
+
+function play_queue()
+    local data = table.remove(playlist)
+    if data then
+        play_soundfile(data.filename, data.volume, data.user)
+    end
 end
 
 function play_soundfile(file, volume, user)
@@ -120,10 +176,12 @@ function play_soundfile(file, volume, user)
         piepan.Audio:stop()
     end
 
-    local success = piepan.me.channel:play({filename=file, volume=volume})
+    local success = piepan.me.channel:play({filename=file, volume=volume}, play_queue)
 
     if not success then
         user:send("I couldn't play that sound, sorry.")
+    else
+        current = file:match('^sounds/(.+).ogg$')
     end
 end
 

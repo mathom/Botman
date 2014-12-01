@@ -56,16 +56,13 @@ function piepan.onMessage(msg)
         end
     end
 
-    local playshortcut = msg.text:match('^@(%w+)$')
-
-    local command, rest = msg.text:match('^!(%w+) ?(.*)$')
+    local mode, command, rest = msg.text:match('^([!@])(%w+) ?(.*)$')
+    if mode == '@' then
+        rest = command .. ' ' .. rest
+        command = 'play'
+    end
     if command == nil then
-        if playshortcut ~= nil then
-            command = 'play'
-            rest = playshortcut
-        else
-            return
-        end
+        return
     end
 
     local args = {}

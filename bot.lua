@@ -7,7 +7,8 @@ shortcuts = {
   s = 'stop',
   ql = 'queuelist',
   qc = 'queueclear',
-  h = 'help'
+  h = 'help',
+  pl = 'playlist'
 }
 
 function join_channel()

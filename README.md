@@ -26,3 +26,17 @@ Note that you can specify `--channel` to make the bot join a specific channel.
 
 Type `!help` in the chat for a list of commands. You can whisper them to the bot as well,
 but be sure to send regular text and not HTML.
+
+Themes
+------
+
+Themes can be played when a user joins Botman's channel.
+Simply make a text file named `mythemes.txt` with contents like this:
+```
+101:introtheme
+203:anothersound
+```
+
+Now, just run Botman with the `--themes=mythemes.txt` flag.
+
+When users with ids that match 101 and 203 join they will be welcomed with the corresponding sound.

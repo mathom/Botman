@@ -1,6 +1,7 @@
 commands = {}
 responses = {}
 playlist = {}
+themes = {}
 current = nil
 default_volume = 0.25
 
@@ -14,10 +15,24 @@ shortcuts = {
 }
 
 function join_channel()
-    if piepan.args['channel'] ~= nil then
+    if piepan.args['channel'] then
         print('Joining channel ' .. piepan.args['channel'][1])
         local home_channel = piepan.channels(piepan.args['channel'])
-        piepan.me:moveTo(home_dudes)
+        piepan.me:moveTo(home_channel)
+    end
+end
+
+function load_themes()
+    if piepan.args.themes ~= nil then
+        for _,file in ipairs(piepan.args.themes) do
+            print('Loading ' .. file)
+            local f = io.open(file, 'r')
+            for line in f:lines() do
+                local id, theme = line:match('([%d]+):([%w]+)')
+                themes[tonumber(id)] = theme
+                print('Userid ' .. id .. ' = ' .. theme)
+            end
+        end
     end
 end
 
@@ -46,14 +61,21 @@ function piepan.onUserChange(event)
     local my_channel = piepan.me.channel.id
     if event.isChangedChannel and event.user.channel.id == my_channel then
         if not has_seen_user[event.user.userId] then
-            commands.c_say(event.user, {'hello, ' .. event.user.name .. '!'})
-            has_seen_user[event.user.userId] = true
+            print('User joined: ' .. event.user.name .. ' ' .. event.user.userId)
+            if themes[event.user.userId] then
+                commands.c_queueclear(event.user, {})
+                commands.c_play(event.user, {themes[event.user.userId]})
+            else
+                commands.c_say(event.user, {'hello, ' .. event.user.name .. '!'})
+            end
+            -- has_seen_user[event.user.userId] = true
         end
     end
 end
 
 function piepan.onConnect()
     load_responses()
+    load_themes()
     join_channel()
 end
 
@@ -134,6 +156,7 @@ function commands.c_queue(user, args)
         user:send("Sound file does not exist!")
         return
     end
+    print('User ' .. user.name .. ' playing ' .. filename)
 
     table.insert(playlist, 1, {user=user, volume=volume, filename=filename})
 

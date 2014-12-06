@@ -2,13 +2,15 @@ commands = {}
 responses = {}
 playlist = {}
 current = nil
+default_volume = 0.25
 
 shortcuts = {
   s = 'stop',
   ql = 'queuelist',
   qc = 'queueclear',
   h = 'help',
-  pl = 'playlist'
+  pl = 'playlist',
+  ls = 'playlist'
 }
 
 function join_channel()
@@ -120,13 +122,18 @@ end
 commands.h_queue='Queue a sound to play. See !playlist and !play.'
 function commands.c_queue(user, args)
 
-    local volume = 0.5
+    local volume = default_volume
 
     if args[2] ~= nil then
         volume = tonumber(args[2])
     end
 
     local filename = 'sounds/' .. args[1] .. '.ogg'
+
+    if not file_exists(filename) then
+        user:send("Sound file does not exist!")
+        return
+    end
 
     table.insert(playlist, 1, {user=user, volume=volume, filename=filename})
 
@@ -142,7 +149,8 @@ function commands.c_queuelist(user, args)
         table.insert(lines, data.filename:match('^sounds/(.+).ogg$'))
     end
     if current then
-        user:send('Currently playing: ' .. current)
+        local name = current.filename:match('^sounds/(.+).ogg$')
+        user:send('Currently playing: ' .. name)
     end
 
     if #lines > 0 then
@@ -160,19 +168,32 @@ end
 
 commands.h_play='Play a supported soundfile. See !playlist.'
 function commands.c_play(user, args)
-    playlist = {}
-    commands.c_stop(user, args)
-    commands.c_queue(user, args)
+    -- playlist = {}
+    -- commands.c_stop(user, args)
+    local old_sound = current
+    -- piepan.Audio:stop()
+    commands.c_queue(user, args, true)
+    if old_sound then
+        -- table.insert(playlist, old_sound)
+    end
 end
 
 function play_queue()
     local data = table.remove(playlist)
     if data then
+        current = data
         play_soundfile(data.filename, data.volume, data.user)
+    else
+        current = nil
     end
 end
 
 function play_soundfile(file, volume, user)
+    if not file_exists(file) then
+        user:send("Sound file does not exist!")
+        return
+    end
+
     if piepan.Audio:isPlaying() then
         piepan.Audio:stop()
     end
@@ -181,8 +202,8 @@ function play_soundfile(file, volume, user)
 
     if not success then
         user:send("I couldn't play that sound, sorry.")
-    else
-        current = file:match('^sounds/(.+).ogg$')
+        current = nil
+        play_queue()
     end
 end
 
@@ -275,12 +296,19 @@ end
 
 commands.h_playlist='List files available to !play.'
 function commands.c_playlist(user, args)
-    local ls = io.popen('ls -sh1 sounds')
+
+    local command = 'ls -sh1 sounds'
+    if args[1] then
+        local glob = args[1]:match('(%w+)')
+        command = command .. ' | grep ' .. glob
+    end
+    local ls = io.popen(command)
 
     local files = {}
     local file = ls:read()
     while file ~= nil do
         local size, name = file:match('([^.]+) ([^.]+)')
+        print(size .. ' ' .. name)
         if name ~= 'total' then
             table.insert(files, '<b>' .. name .. '</b> - ' .. size)
         end
@@ -292,7 +320,11 @@ function commands.c_playlist(user, args)
     for _,line in ipairs(files) do
         table.insert(lines, line)
         if #lines >= 50 then
-            user:send('Sound files (' .. pages .. '):<br/>' .. table.concat(lines, '<br/>'))
+            if pages > 1 then
+                user:send('Sound files (' .. pages .. '):<br/>' .. table.concat(lines, '<br/>'))
+            else
+                user:send('Sound files:<br/>' .. table.concat(lines, '<br/>'))
+            end
             lines = {}
             pages = pages + 1
         end
@@ -305,7 +337,7 @@ end
 
 commands.h_ytplay='Download and play the audio from Youtube (supply video ID only).'
 function commands.c_ytplay(user, args)
-    local volume = 1.0
+    local volume = default_volume
 
     if args[2] ~= nil then
         volume = tonumber(args[2])

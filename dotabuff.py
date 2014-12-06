@@ -175,12 +175,12 @@ def make_commentary(stats, playermap, debug):
             return dota_to_mumble[dota_dict['dota_id']]
         else:
             return 'a pub'
-
+    '''
     commentary.append((1.0-stats['worst_ratio'][0],
                        'Your ' + stats['worst_ratio'][1] + ' is terrible!'))
     commentary.append((stats['best_ratio'][0],
                        'Pretty good ' + stats['best_ratio'][1]))
-
+    '''
     best_kda_name = dota_to_mumble[stats['best_kda'][1]['dota_id']]
     worst_kda_name = dota_to_mumble[stats['worst_kda'][1]['dota_id']]
 

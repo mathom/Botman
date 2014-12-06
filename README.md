@@ -9,7 +9,7 @@ Installation
 Build a copy of [piepan](https://github.com/layeh/piepan) for yourself.
 Install the required command line tools:
 
-```sudo apt-get install fortune espeak youtube-dl libav-tools```
+```sudo apt-get install fortune espeak youtube-dl libav-tools normalize-audio```
 
 You can also compile [SAM](https://github.com/s-macke/SAM) if you like.
 

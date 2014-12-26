@@ -60,15 +60,15 @@ has_seen_user = {}
 function piepan.onUserChange(event)
     local my_channel = piepan.me.channel.id
     if event.isChangedChannel and event.user.channel.id == my_channel then
+        print('User joined: ' .. event.user.name .. ' ' .. event.user.userId)
         if not has_seen_user[event.user.userId] then
-            print('User joined: ' .. event.user.name .. ' ' .. event.user.userId)
             if themes[event.user.userId] then
                 commands.c_queueclear(event.user, {})
                 commands.c_play(event.user, {themes[event.user.userId]})
             else
                 commands.c_say(event.user, {'hello, ' .. event.user.name .. '!'})
+                has_seen_user[event.user.userId] = true
             end
-            -- has_seen_user[event.user.userId] = true
         end
     end
 end
@@ -233,7 +233,8 @@ end
 commands.h_say='Speak your message aloud.'
 function commands.c_say(user, args)
     local cargs = ''
-    local mode = 'espeak'
+    -- local mode = 'espeak'
+    local mode = 'pico'
     local pitch_flag = ' -p '
     local speed_flag = ' -s '
 
@@ -241,6 +242,10 @@ function commands.c_say(user, args)
         mode = 'sam'
         pitch_flag = ' -pitch '
         speed_flag = ' -speed '
+        table.remove(args, 1)
+    end
+    if args[1] == 'espeak' then
+        mode = 'espeak'
         table.remove(args, 1)
     end
 
@@ -272,12 +277,14 @@ function commands.c_say(user, args)
 
     local input = '/tmp/say.wav'
     os.remove(input)
-    local message = table.concat(args, ' '):gsub('[^a-zA-Z0-9,\'-\\!. ]','\\%1')
+    local message = table.concat(args, ' '):gsub("[^a-zA-Z0-9,\'-\\!. #:]","\\%1")
     print('User ' .. user.name .. ' is saying ' .. message)
     if mode == 'espeak' then
         command = 'espeak ' .. cargs .. ' -w ' .. input .. ' "' .. message .. '"'
     elseif mode == 'sam' then
         command = 'sam ' .. cargs .. ' -wav ' .. input .. ' "' .. message .. '"'
+    elseif mode == 'pico' then
+        command = 'pico2wave ' .. ' -w ' .. input .. ' "' .. message .. '"'
     end
     rval, rtype = os.execute(command)
 

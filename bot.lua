@@ -258,16 +258,16 @@ function commands.c_say(user, args)
     if speed ~= nil then
         cargs = cargs .. speed_flag .. speed
     end
-    local variant = sargs:match('v\'(.+)\'')
+    local variant = sargs:match("v'(.+)'")
     if variant ~= nil then
         cargs = cargs .. ' -v ' .. variant
     end
     local throat = sargs:match('t(%d+)')
-    if variant ~= nil then
+    if throat ~= nil then
         cargs = cargs .. ' -throat ' .. throat
     end
     local mouth = sargs:match('m(%d+)')
-    if variant ~= nil then
+    if mouth ~= nil then
         cargs = cargs .. ' -mouth ' .. mouth
     end
 

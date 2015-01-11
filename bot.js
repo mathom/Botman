@@ -37,14 +37,14 @@ piepan.On('connect', function(e) {
 
 piepan.On('message', function(e) {
     if (e.Sender == null) {
-        console.log('ignoring message from null sender');
+        //console.log('ignoring message from null sender');
         return;
     }
 
     var command_re = /^([+!@])(\w+) ?([\w-_.: ]*)$/;
     var match = command_re.exec(e.Message);
     if (!match) {
-        console.log('ignoring badly formatted message', e.Message);
+        //console.log('ignoring badly formatted message', e.Message);
         return;
     }
     var mode = match[1];
@@ -140,6 +140,12 @@ function play_queue() {
     else {
         current = null;
     }
+}
+
+commands.h_queueclear='Clear the play queue. See !queue.'
+commands.c_queueclear = function(user, args) {
+    playlist = [];
+    commands.c_stop(user, args);
 }
 
 function play_soundfile(file, volume, user) {

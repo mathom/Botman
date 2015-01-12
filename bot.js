@@ -148,6 +148,14 @@ commands.c_queueclear = function(user, args) {
     commands.c_stop(user, args);
 }
 
+commands.h_stream='Play the local MPD stream.'
+commands.c_stream = function(user, args) {
+    piepan.Audio.Stop();
+    console.log('playing MPD stream');
+    piepan.Audio.SetBitrate(44100);
+    piepan.Audio.Play({filename: 'mpd.ogg'});
+}
+
 function play_soundfile(file, volume, user) {
     if (!file_exists(file)) {
         user.Send("Sound file does not exist!");
@@ -159,6 +167,7 @@ function play_soundfile(file, volume, user) {
     }
 
     piepan.Audio.SetVolume(volume);
+    piepan.Audio.SetBitrate(48000);
     piepan.Audio.Play({filename: file, callback: play_queue});
 }
 

@@ -93,7 +93,7 @@ commands.c_help = function(user, args) {
 
 commands.h_stop='Stop playing sound.'
 commands.c_stop = function(user, args) {
-    if (user.UserID != 14 && user.UserID != 46) {
+    if (user.UserID() != 14 && user.UserID() != 46) {
         piepan.Audio.Stop()
     }
 }
@@ -167,7 +167,7 @@ function play_soundfile(file, volume, user) {
     }
 
     piepan.Audio.SetVolume(volume);
-    piepan.Audio.SetBitrate(48000);
+    piepan.Audio.SetBitrate(44100);
     piepan.Audio.Play({filename: file, callback: play_queue});
 }
 

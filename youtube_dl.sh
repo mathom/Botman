@@ -11,11 +11,11 @@ if [ $? -eq 0 ]; then
     fi
     COMMAND="avconv -y -i $NAME -ac 1 -ar 44100 -codec:a libvorbis"
 
-    if [ ! -z "$3" ]; then
+    if [ "$3" -ne "undefined" ]; then
         COMMAND="$COMMAND -ss $3"
     fi
 
-    if [ ! -z "$4" ]; then
+    if [ "$4" -ne "undefined" ]; then
         COMMAND="$COMMAND -t $4"
     fi
     echo $COMMAND

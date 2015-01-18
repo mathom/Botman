@@ -5,7 +5,8 @@ var themes = {};
 var current = null;
 
 var default_config = {
-    default_volume: 0.25
+    default_volume: 0.25,
+    mpd_stream: 'http://localhost:6601'
 };
 
 var shortcuts = {
@@ -153,7 +154,7 @@ commands.c_stream = function(user, args) {
     piepan.Audio.Stop();
     console.log('playing MPD stream');
     piepan.Audio.SetBitrate(44100);
-    piepan.Audio.Play({filename: 'mpd.ogg'});
+    piepan.Audio.Play({filename: config.mpd_stream});
 }
 
 function play_soundfile(file, volume, user) {

@@ -6,6 +6,7 @@ var current = null;
 
 var default_config = {
     default_volume: 0.25,
+    message_max: 5000,
     mpd_stream: 'http://localhost:6601'
 };
 
@@ -16,7 +17,8 @@ var shortcuts = {
     h: 'help',
     pl: 'playlist',
     ls: 'playlist',
-    v: 'volume'
+    v: 'volume',
+    m: 'mpc'
 };
 
 piepan.On('connect', function(e) {
@@ -42,8 +44,9 @@ piepan.On('message', function(e) {
         return;
     }
 
-    var command_re = /^([+!@])(\w+) ?([\w-_.: ]*)$/;
-    var match = command_re.exec(e.Message);
+    var msg = e.Message.replace(/&quot;/g, '"');
+    var command_re = /^([+!@])(\w+)?([\w-_.: \/"']*)$/;
+    var match = command_re.exec(msg);
     if (!match) {
         //console.log('ignoring badly formatted message', e.Message);
         return;
@@ -67,7 +70,16 @@ piepan.On('message', function(e) {
         return;
     }
 
-    var args = rest.split(/\s+/);
+    var args = rest.match(/"[^"]*"|[^\s"]+/g);
+    if (args !== undefined) {
+        for (var i=0; i<args.length; i++) {
+            var str = args[i];
+            if (str.charAt(0) === '"' && str.charAt(str.length -1) === '"')
+            {
+                args[i] = str.substr(1,str.length -2);
+            }
+        }
+    }
 
     if (shortcuts[command]) {
         command = shortcuts[command];
@@ -232,6 +244,105 @@ commands.c_playlist = function(user, args) {
         }
     }, '/bin/bash', '-c', 'ls -sh1 ' + directory);
 }
+/*
+commands.h_say='Speak your message aloud.'
+commands.c_say = function(user, args) {
+    var cargs = '';
+    var mode = 'pico';
+    var pitch_flag = ' -p ';
+    var speed_flag = ' -s ';
+
+    if (user.UserID() == 14 || user.UserID() == 46) {
+        return;
+    }
+
+    if (args[0] == 'c64') {
+        mode = 'sam'
+        pitch_flag = ' -pitch '
+        speed_flag = ' -speed '
+        args.shift();
+    }
+    if (args[0] == 'espeak') {
+        mode = 'espeak';
+        args.shift();
+    }
+
+    var sargs = args[0];
+
+    var matches = {
+        /p(%d+)/: pitch_flag,
+        /s(%d+)/: speed_flag,
+        /v'(.+)'/: ' -v ',
+        /t(%d+)/: ' -throat ',
+        /m(%d+)/: ' -mouth '
+    };
+
+    for (var re in matches) {
+        var match = re.exec(sargs);
+        if (match) {
+            cargs = cargs + matches[re] + match[1];
+        }
+    }
+
+    if (cargs) args.shift();
+
+    var input = '/tmp/say.wav';
+    // var message = table.concat(args, ' '):gsub("[^a-zA-Z0-9,\'-\\!. #:]","\\%1");
+    console.log('User', user.Name(), 'is saying', message);
+    switch (mode) {
+        case 'espeak':
+            command = 'espeak ' + cargs + ' -w ' + input + ' "' + message + '"';
+            break;
+        case 'sam':
+            command = 'sam ' + cargs + ' -wav ' + input + ' "' + message + '"';
+            break;
+        case 'pico':
+            command = 'pico2wave ' + ' -w ' + input + ' "' + message + '"';
+            break;
+    }
+    console.log('User', user.Name(), 'is running:', command);
+
+
+    rval, rtype = os.execute(command)
+
+    if rtype ~= 'exit' or not rval then
+        user:send('Error speaking!')
+        return
+    end
+
+    local out = '/tmp/say.ogg'
+    os.remove(out)
+    command = 'avconv -i ' .. input .. ' -ac 1 -ar 44100 -codec:a libvorbis ' .. out
+    rval, rtype = os.execute(command)
+
+    if rtype ~= 'exit' or not rval then
+        user:send('Error converting audio! ' .. rval .. ' ' .. rtype)
+        return
+    end
+
+    play_soundfile(out, 1.0, user)
+    }
+*/
+
+function message_pre(user, data) {
+    var m = config.message_max - '<pre></pre>'.length;
+    console.log('max', m);
+
+    var splits = [];
+    if (data.indexOf('\n') === -1) {
+        data = data + '\n';
+    }
+
+    for (var start=0; start<data.length; start+=m) {
+        var last = data.lastIndexOf('\n', Math.min(start+m, data.length));
+        splits.push([start, last]);
+        start = last+1;
+    }
+
+    for (var i=0; i<splits.length; i++) {
+        user.Send('<pre>' + data.substring(splits[i][0], splits[i][1]) + '</pre>');
+    }
+}
 
 commands.h_ytsave='Download and save a Youtube (video ID) with a name.'
 commands.c_ytsave = function(user, args) {
@@ -252,5 +363,19 @@ commands.c_ytsave = function(user, args) {
             user.Send('Saved new sound to ' + args[1]);
         }
     }, '/bin/bash', 'youtube_dl.sh', hash, dest, ss, t);
+}
+
+commands.h_mpc='Use MPC to control the local MPD server.'
+commands.c_mpc = function(user, args) {
+    console.log('User', user.Name(), 'mpc', args);
+
+    var callback = function (success, data) {
+        console.log(data);
+        //user.Send('<pre>' + data + '</pre>');
+        message_pre(user, data);
+    };
+    args.unshift('/usr/bin/mpc');
+    args.unshift(callback);
+    piepan.Process.New.apply(null, args);
 }
 

@@ -118,7 +118,7 @@ commands.c_play = function(user, args) {
 
 commands.h_volume='Set output volume to specified value.'
 commands.c_volume = function(user, args) {
-    piepan.Audio.SetVolume(parseFloat(args[0]));
+    piepan.Audio.SetVolume(Math.min(parseFloat(args[0]), 1));
 }
 
 commands.h_queue='Queue a sound to play. See !playlist and !play.'
@@ -179,7 +179,7 @@ function play_soundfile(file, volume, user) {
         piepan.Audio.Stop();
     }
 
-    piepan.Audio.SetVolume(volume);
+    piepan.Audio.SetVolume(Math.min(volume,1));
     piepan.Audio.SetBitrate(44100);
     piepan.Audio.Play({filename: file, callback: play_queue});
 }

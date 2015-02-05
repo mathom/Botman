@@ -45,7 +45,7 @@ piepan.On('message', function(e) {
     }
 
     var msg = e.Message.replace(/&quot;/g, '"');
-    var command_re = /^([+!@])(\w+)?([\w-_.: \/"']*)$/;
+    var command_re = /^([+!@])(\w+)?([\w-_.: \/"'~!?#\[\]]*)$/;
     var match = command_re.exec(msg);
     if (!match) {
         //console.log('ignoring badly formatted message', e.Message);
@@ -79,6 +79,9 @@ piepan.On('message', function(e) {
                 args[i] = str.substr(1,str.length -2);
             }
         }
+    }
+    else {
+        args = [];
     }
 
     if (shortcuts[command]) {
@@ -211,13 +214,18 @@ function file_exists(file) {
 commands.h_playlist='List files available to !play.'
 commands.c_playlist = function(user, args) {
     var directory = 'sounds';
-    if (args[0]) {
-        directory = directory + ' | grep '  + args[0];
-    }
-    console.log(user.Name(), 'listing', directory);
 
     function print_page(num, lines) {
         user.Send('Sound files (' + num + '):<br/>' + lines.join('<br/>'));
+    }
+
+    var filter = args[0];
+
+    if (filter) {
+        console.log(user.Name(), 'listing', directory, 'filtering by', filter);
+    }
+    else {
+        console.log(user.Name(), 'listing', directory);
     }
 
     piepan.Process.New(function (success, data) {
@@ -230,6 +238,9 @@ commands.c_playlist = function(user, args) {
         var page = 1;
         while ((match = match_re.exec(data)) !== null) {
             if (match[1] != 'total') {
+                if (filter && match[2].indexOf(filter) === -1) {
+                    continue;
+                }
                 var name = match[2].split('.').shift();
                 lines.push('<b>' + name + '</b> - ' + match[1]);
             }
@@ -326,7 +337,6 @@ commands.c_say = function(user, args) {
 
 function message_pre(user, data) {
     var m = config.message_max - '<pre></pre>'.length;
-    console.log('max', m);
 
     var splits = [];
     if (data.indexOf('\n') === -1) {
@@ -377,5 +387,11 @@ commands.c_mpc = function(user, args) {
     args.unshift('/usr/bin/mpc');
     args.unshift(callback);
     piepan.Process.New.apply(null, args);
+
+    console.log('first arg is', args[2]);
+    if (args[2] == 'play') {
+        console.log('playing stream');
+        commands.c_stream(user, []);
+    }
 }
 

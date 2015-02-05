@@ -16,7 +16,7 @@ Usage
 
 Run like you would any other piepan bot:
 
-```/piepan -username Botman -insecure=true -certificate botman.pem piepan.conf```
+```piepan -username Botman -insecure=true -certificate botman.pem piepan.conf```
 
 Note that you can specify `--channel` to make the bot join a specific channel.
 

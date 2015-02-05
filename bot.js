@@ -3,6 +3,7 @@ var responses = {};
 var playlist = [];
 var themes = {};
 var current = null;
+var current_volume;
 
 var default_config = {
     default_volume: 0.25,
@@ -18,6 +19,7 @@ var shortcuts = {
     pl: 'playlist',
     ls: 'playlist',
     v: 'volume',
+    vd: 'volumedefault',
     m: 'mpc'
 };
 
@@ -119,9 +121,23 @@ commands.c_play = function(user, args) {
     commands.c_queue(user, args, true);
 }
 
+function set_volume(val) {
+    current_volume = Math.min(val, 1);
+    piepan.Audio.SetVolume(current_volume);
+}
+
 commands.h_volume='Set output volume to specified value.'
 commands.c_volume = function(user, args) {
-    piepan.Audio.SetVolume(Math.min(parseFloat(args[0]), 1));
+    if (args[0])
+        set_volume(parseFloat(args[0]));
+    else
+        user.Send('Current volume: ' + current_volume);
+}
+
+commands.h_volumedefault='Set default output volume to specified value.'
+commands.c_volumedefault = function(user, args) {
+    if (args[0])
+        config.default_volume = Math.min(parseFloat(args[0]), 1);
 }
 
 commands.h_queue='Queue a sound to play. See !playlist and !play.'
@@ -168,8 +184,7 @@ commands.h_stream='Play the local MPD stream.'
 commands.c_stream = function(user, args) {
     piepan.Audio.Stop();
     console.log('playing MPD stream');
-    piepan.Audio.SetBitrate(44100);
-    piepan.Audio.SetVolume(config.default_volume);
+    set_volume(config.default_volume);
     piepan.Audio.Play({filename: config.mpd_stream});
 }
 
@@ -183,8 +198,7 @@ function play_soundfile(file, volume, user) {
         piepan.Audio.Stop();
     }
 
-    piepan.Audio.SetVolume(Math.min(volume,1));
-    piepan.Audio.SetBitrate(44100);
+    set_volume(volume);
     piepan.Audio.Play({filename: file, callback: play_queue});
 }
 

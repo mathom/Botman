@@ -11,17 +11,18 @@ if [ $? -eq 0 ]; then
     fi
     COMMAND="avconv -y -i $NAME -ac 1 -ar 44100 -codec:a libvorbis"
 
-    if [ "$3" -ne "undefined" ]; then
+    if [ "$3" != "undefined" ]; then
         COMMAND="$COMMAND -ss $3"
     fi
 
-    if [ "$4" -ne "undefined" ]; then
+    if [ "$4" != "undefined" ]; then
         COMMAND="$COMMAND -t $4"
     fi
     echo $COMMAND
     COMMAND="$COMMAND $2"
 
     eval $COMMAND
+    normalize-ogg $2
     RET=$?
 fi
 

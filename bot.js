@@ -362,6 +362,23 @@ commands.c_ytsave = function(user, args) {
     var ss = args[2];
     var t = args[3];
 
+    if (!hash || !hash.match(/[A-Za-z0-9_-]+/)) {
+        user.Send('First argument (hash) is malformed!');
+        return;
+    }
+    if (!args[1] || !args[1].match(/[A-Za-z0-9_-]+/)) {
+        user.Send('Second argument (name) is malformed!');
+        return;
+    }
+    if (ss && !ss.match(/\d\d:\d\d:\d\d/)) {
+        user.Send('Second argument (start time) is malformed!');
+        return;
+    }
+    if (t && !t.match(/\d\d:\d\d:\d\d/g)) {
+        user.Send('Second argument (duration) is malformed!');
+        return;
+    }
+
     console.log('User', user.Name(), 'ytsave', hash, dest, ss, t);
     user.Send('Downloading ' + hash + ' as ' + args[1]);
 

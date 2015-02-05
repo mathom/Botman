@@ -45,7 +45,7 @@ piepan.On('message', function(e) {
     }
 
     var msg = e.Message.replace(/&quot;/g, '"');
-    var command_re = /^([+!@])(\w+)?([\w-_.: \/"'~!?#\[\]]*)$/;
+    var command_re = /^([+!@])(\w+)?(.*)$/;
     var match = command_re.exec(msg);
     if (!match) {
         //console.log('ignoring badly formatted message', e.Message);
@@ -169,6 +169,7 @@ commands.c_stream = function(user, args) {
     piepan.Audio.Stop();
     console.log('playing MPD stream');
     piepan.Audio.SetBitrate(44100);
+    piepan.Audio.SetVolume(config.default_volume);
     piepan.Audio.Play({filename: config.mpd_stream});
 }
 
@@ -388,7 +389,6 @@ commands.c_mpc = function(user, args) {
     args.unshift(callback);
     piepan.Process.New.apply(null, args);
 
-    console.log('first arg is', args[2]);
     if (args[2] == 'play') {
         console.log('playing stream');
         commands.c_stream(user, []);

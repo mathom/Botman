@@ -3,7 +3,7 @@
 RET=1
 AUDIO_OUT=$(mktemp)
 
-youtube-dl --socket-timeout 5 --extract-audio --audio-format m4a -o "$AUDIO_OUT.%(ext)s" $1
+youtube-dl --socket-timeout 5 --extract-audio --audio-format m4a -o "$AUDIO_OUT.%(ext)s" -- $1
 if [ $? -eq 0 ]; then
     NAME=$AUDIO_OUT.m4a
     if [ -f $AUDIO_OUT.ogg ]; then

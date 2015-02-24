@@ -226,7 +226,7 @@ function file_exists(file) {
     return true;
 }
 
-commands.h_playlist='List files available to !play.'
+commands.h_playlist='List files available to !play. Args: ls <sort> <name>'
 commands.c_playlist = function(user, args) {
     var directory = 'sounds';
 
@@ -234,7 +234,24 @@ commands.c_playlist = function(user, args) {
         user.Send('Sound files (' + num + '):<br/>' + lines.join('<br/>'));
     }
 
-    var filter = args[0];
+    var pages = -1;
+
+    var flags = '-sh1';
+    var sort = args[0];
+
+    if (sort == 'date') {
+        args.shift();
+        flags = flags + 'rt';
+    }
+    else if (sort == 'new') {
+        args.shift();
+        flags = flags + 'Rt';
+        pages = 1;
+    }
+    console.log(flags);
+
+
+    var filter = args.shift();
 
     if (filter) {
         console.log(user.Name(), 'listing', directory, 'filtering by', filter);
@@ -263,12 +280,15 @@ commands.c_playlist = function(user, args) {
                 print_page(page, lines);
                 lines = [];
                 page++;
+                if (pages != -1 && page >= pages) {
+                    break;
+                }
             }
         }
         if (lines.length) {
             print_page(page, lines);
         }
-    }, '/bin/bash', '-c', 'ls -sh1 ' + directory);
+    }, '/bin/ls', flags, directory);
 }
 /*
 commands.h_say='Speak your message aloud.'

@@ -226,6 +226,10 @@ function file_exists(file) {
     return true;
 }
 
+function randint (min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 commands.h_playlist='List files available to !play. Args: ls <sort> <name>'
 commands.c_playlist = function(user, args) {
     var directory = 'sounds';
@@ -239,6 +243,10 @@ commands.c_playlist = function(user, args) {
     var flags = '-sh1';
     var sort = args[0];
 
+    if (sort == 'rand') {
+        args.shift();
+        pages = 1;
+    }
     if (sort == 'date') {
         args.shift();
         flags = flags + 'rt';
@@ -260,6 +268,8 @@ commands.c_playlist = function(user, args) {
         console.log(user.Name(), 'listing', directory);
     }
 
+    var num_rand = 10;
+
     piepan.Process.New(function (success, data) {
         if (!success) return;
         var match_re = /(.+) (.+)/g;
@@ -268,15 +278,32 @@ commands.c_playlist = function(user, args) {
         var lines = [];
         var per_page = 50;
         var page = 1;
+        var i = 0;
         while ((match = match_re.exec(data)) !== null) {
+            i = i + 1;
             if (match[1] != 'total') {
                 if (filter && match[2].indexOf(filter) === -1) {
                     continue;
                 }
                 var name = match[2].split('.').shift();
-                lines.push('<b>' + name + '</b> - ' + match[1]);
+                var value = '<b>' + name + '</b> - ' + match[1];
+
+                if (sort == 'rand') {
+                    var p = randint(1, i);
+                    if (lines.length < num_rand) {
+                        lines.push(value);
+                    }
+                    else if (p <= num_rand) {
+                        lines[p-1] = value;
+                    }
+                }
+                else {
+                    lines.push(value);
+                }
             }
             if (lines.length >= per_page) {
+                if (sort == 'rand')
+                    lines.sort();
                 print_page(page, lines);
                 lines = [];
                 page++;
@@ -286,6 +313,8 @@ commands.c_playlist = function(user, args) {
             }
         }
         if (lines.length) {
+            if (sort == 'rand')
+                lines.sort();
             print_page(page, lines);
         }
     }, '/bin/ls', flags, directory);

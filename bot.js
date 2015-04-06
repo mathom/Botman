@@ -3,6 +3,7 @@ var responses = {};
 var playlist = [];
 var themes = {};
 var current = null;
+var last_stopped = null;
 var current_volume;
 
 var default_config = {
@@ -13,6 +14,7 @@ var default_config = {
 
 var shortcuts = {
     s: 'stop',
+    r: 'resume',
     ql: 'queuelist',
     qc: 'queueclear',
     h: 'help',
@@ -20,7 +22,8 @@ var shortcuts = {
     ls: 'playlist',
     v: 'volume',
     vd: 'volumedefault',
-    m: 'mpc'
+    m: 'mpc',
+    r: 'resume'
 };
 
 piepan.On('connect', function(e) {
@@ -29,7 +32,7 @@ piepan.On('connect', function(e) {
     }
 
     if (config.channel) {
-        console.log('Joining channel ' + config.channel);
+        console.log('Joining channel', config.channel);
         for (var p in piepan.Channels) {
             if (piepan.Channels[p].Name == config.channel) {
                 piepan.Self.Move(piepan.Channels[p]);
@@ -42,6 +45,26 @@ piepan.On('connect', function(e) {
             config[key] = default_config[key];
         }
     }
+
+    var fh = piepan.File.Open('resume.json','r');
+    if (fh !== undefined) {
+        console.log('reading system state from resume.json');
+        var data = JSON.parse(fh.Read());
+        if (data) {
+            playlist = data.playlist;
+            current = data.current;
+            last_stopped = data.last_stopped;
+            current_volume = data.current_volume;
+            play_queue();
+        }
+        fh.Close();
+        fh = piepan.File.Open('resume.json','w+');
+        fh.Close();
+    }
+});
+
+piepan.On('disconnect', function(e) {
+    c_suspend({Name:'system'});
 });
 
 piepan.On('message', function(e) {
@@ -51,7 +74,7 @@ piepan.On('message', function(e) {
     }
 
     var msg = e.Message.replace(/&quot;/g, '"');
-    var command_re = /^([+!@])(\w+)?(.*)$/;
+    var command_re = /^([+!@#])(\w+)?(.*)$/;
     var match = command_re.exec(msg);
     if (!match) {
         //console.log('ignoring badly formatted message', e.Message);
@@ -64,6 +87,10 @@ piepan.On('message', function(e) {
     switch (mode) {
         case '@':
             rest = command + ' ' + rest;
+            command = 'play';
+            break;
+        case '#':
+            rest = command + ' ' + rest + ' interrupt';
             command = 'play';
             break;
         case '+':
@@ -99,6 +126,33 @@ piepan.On('message', function(e) {
     }
 });
 
+commands.h_suspend='Save the current playback state.';
+commands.c_suspend = function(user, args) {
+    commands.c_stop(user);
+
+    var data = JSON.stringify({
+        playlist: playlist,
+        current: current,
+        last_stopped: last_stopped,
+        current_volume: current_volume
+    }, function(key, val) {
+        // User objects need to be stripped out
+        if (key == 'user') {
+            return {Name: val.Name};
+        }
+        else {
+            return val;
+        }
+    });
+
+    var fh = piepan.File.Open('resume.json','w');
+    console.log('User', user.Name, 'saving system state to resume.json');
+    if (fh !== undefined) {
+        fh.Write(data);
+        fh.Close()
+    }
+}
+
 commands.h_help='Print this help message.';
 commands.c_help = function(user, args) {
     var result = [];
@@ -113,20 +167,41 @@ commands.c_help = function(user, args) {
     user.Send('Available commands:<br/>' + result.join('<br/>'));
 }
 
-commands.h_stop='Stop playing sound.'
+commands.h_stop='Stop playing sound. Use !resume to resume.'
 commands.c_stop = function(user, args) {
-    if (user.UserID() != 14 && user.UserID() != 46) {
-        piepan.Audio.Stop()
+    if (piepan.Audio.IsPlaying()) {
+        var at = piepan.Audio.Stop();
+        if (!current.interrupt && (!args || args[0] === undefined)) {
+            last_stopped = current;
+            last_stopped.at = at;
+            console.log('User', user.Name, 'stopped', current.filename, 'at', at);
+        }
+        current = null;
     }
 }
 
 commands.h_play='Play a supported soundfile. See !playlist.'
 commands.c_play = function(user, args) {
-    commands.c_queue(user, args, true);
+    commands.c_queue(user, args);
+}
+
+commands.h_resume='Resume the last song that was stopped'
+commands.c_resume = function(user, args) {
+    if (!piepan.Audio.IsPlaying() && last_stopped) {
+        console.log('User', user.Name, 'resuming playback of', last_stopped.filename);
+        playlist.unshift(last_stopped);
+        last_stopped = null;
+        play_queue();
+    }
+}
+
+function volume_clamp(val) {
+    return 0.1*Math.min(val, 10);
 }
 
 function set_volume(val) {
-    current_volume = 0.1*Math.min(val, 10);
+    current_volume = volume_clamp(val);
+    current.volume = current_volume;
     piepan.Audio.SetVolume(current_volume);
 }
 
@@ -141,37 +216,56 @@ commands.c_volume = function(user, args) {
 commands.h_volumedefault='Set default output volume to specified value.'
 commands.c_volumedefault = function(user, args) {
     if (args[0])
-        config.default_volume = Math.min(parseFloat(args[0]), 10);
+        config.default_volume = parseFloat(args[0]);
 }
 
 commands.h_queue='Queue a sound to play. See !playlist and !play.'
-commands.c_queue = function(user, args, interrupt) {
-    var volume = config.default_volume;
+commands.c_queue = function(user, args) {
+    var volume = volume_clamp(config.default_volume);
+    var interrupt = false;
+    var filename = 'sounds/' + args.shift() + '.ogg';
 
-    if (args[1]) {
-        volume = parseFloat(args[1]);
+    var arg = args.shift();
+    while (arg !== undefined) {
+        if (arg == 'interrupt') {
+            interrupt = true;
+        }
+        else {
+            volume = volume_clamp(parseFloat(arg));
+        }
+        arg = args.shift();
     }
-
-    var filename = 'sounds/' + args[0] + '.ogg';
 
     if (!file_exists(filename)) {
         user.Send("Sound file does not exist!");
         return;
     }
-    console.log('User ' + user.Name + ' playing ' + filename);
+    console.log('User', user.Name, 'playing', filename);
 
-    playlist.push({user: user, volume: volume, filename: filename});
-
-    if (!piepan.Audio.IsPlaying()) {
-        play_queue()
+    var data = {user: user, volume: volume, filename: filename};
+    if (interrupt) {
+        data.interrupt = true;
+        if (!current.interrupt) {
+            playlist.unshift(current);
+        }
+        playlist.unshift(data);
+        current.at = piepan.Audio.Stop();
     }
+    else {
+        playlist.push(data);
+        if (!piepan.Audio.IsPlaying()) {
+            play_queue();
+        }
+    }
+
 }
 
 function play_queue() {
     var data = playlist.shift();
+
     if (data) {
         current = data;
-        play_soundfile(data.filename, data.volume, data.user);
+        play_soundfile(data.filename, data.volume, data.user, data.at);
     }
     else {
         current = null;
@@ -192,18 +286,24 @@ commands.c_stream = function(user, args) {
     piepan.Audio.Play({filename: config.mpd_stream});
 }
 
-function play_soundfile(file, volume, user) {
+function play_soundfile(file, volume, user, at) {
     if (!file_exists(file)) {
-        user.Send("Sound file does not exist!");
+        if (user.Send) {
+            user.Send("Sound file does not exist!");
+        }
         return;
+    }
+
+    if (at === undefined) {
+        at = 0;
     }
 
     if (piepan.Audio.IsPlaying()) {
         piepan.Audio.Stop();
     }
 
-    set_volume(volume);
-    piepan.Audio.Play({filename: file, callback: play_queue});
+    piepan.Audio.SetVolume(volume);
+    piepan.Audio.Play({filename: file, callback: play_queue, startSeconds: at});
 }
 
 commands.h_queuelist='Display play queue. See !queue.'
@@ -336,7 +436,7 @@ commands.c_say = function(user, args) {
     var pitch_flag = ' -p ';
     var speed_flag = ' -s ';
 
-    if (user.UserID() == 14 || user.UserID() == 46) {
+    if (user.UserID == 14 || user.UserID == 46) {
         return;
     }
 

@@ -227,7 +227,14 @@ commands.c_queuelist = function(user, args) {
 }
 
 function file_exists(file) {
-    return true;
+    var fh = piepan.File.Open(file,'r');
+    if (fh !== undefined) {
+        fh.Close();
+        return true;
+    }
+    else {
+        return false;
+    }
 }
 
 function randint (min, max) {

@@ -30,7 +30,11 @@ piepan.On('connect', function(e) {
 
     if (config.channel) {
         console.log('Joining channel ' + config.channel);
-        piepan.Self.Move(piepan.Channels[config.channel]);
+        for (var p in piepan.Channels) {
+            if (piepan.Channels[p].Name == config.channel) {
+                piepan.Self.Move(piepan.Channels[p]);
+            }
+        }
     }
 
     for (var key in default_config) {

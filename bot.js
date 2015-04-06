@@ -6,7 +6,7 @@ var current = null;
 var current_volume;
 
 var default_config = {
-    default_volume: 0.25,
+    default_volume: 2.5,
     message_max: 5000,
     mpd_stream: 'http://localhost:6601'
 };
@@ -122,7 +122,7 @@ commands.c_play = function(user, args) {
 }
 
 function set_volume(val) {
-    current_volume = Math.min(val, 1);
+    current_volume = 0.1*Math.min(val, 10);
     piepan.Audio.SetVolume(current_volume);
 }
 
@@ -137,7 +137,7 @@ commands.c_volume = function(user, args) {
 commands.h_volumedefault='Set default output volume to specified value.'
 commands.c_volumedefault = function(user, args) {
     if (args[0])
-        config.default_volume = Math.min(parseFloat(args[0]), 1);
+        config.default_volume = Math.min(parseFloat(args[0]), 10);
 }
 
 commands.h_queue='Queue a sound to play. See !playlist and !play.'
@@ -154,7 +154,7 @@ commands.c_queue = function(user, args, interrupt) {
         user.Send("Sound file does not exist!");
         return;
     }
-    console.log('User ' + user.Name() + ' playing ' + filename);
+    console.log('User ' + user.Name + ' playing ' + filename);
 
     playlist.push({user: user, volume: volume, filename: filename});
 
@@ -256,16 +256,14 @@ commands.c_playlist = function(user, args) {
         flags = flags + 'Rt';
         pages = 1;
     }
-    console.log(flags);
-
 
     var filter = args.shift();
 
     if (filter) {
-        console.log(user.Name(), 'listing', directory, 'filtering by', filter);
+        console.log(user.Name, 'listing', directory, 'filtering by', filter);
     }
     else {
-        console.log(user.Name(), 'listing', directory);
+        console.log(user.Name, 'listing', directory);
     }
 
     var num_rand = 10;
@@ -363,7 +361,7 @@ commands.c_say = function(user, args) {
 
     var input = '/tmp/say.wav';
     // var message = table.concat(args, ' '):gsub("[^a-zA-Z0-9,\'-\\!. #:]","\\%1");
-    console.log('User', user.Name(), 'is saying', message);
+    console.log('User', user.Name, 'is saying', message);
     switch (mode) {
         case 'espeak':
             command = 'espeak ' + cargs + ' -w ' + input + ' "' + message + '"';
@@ -375,7 +373,7 @@ commands.c_say = function(user, args) {
             command = 'pico2wave ' + ' -w ' + input + ' "' + message + '"';
             break;
     }
-    console.log('User', user.Name(), 'is running:', command);
+    console.log('User', user.Name, 'is running:', command);
 
 
     rval, rtype = os.execute(command)
@@ -442,7 +440,7 @@ commands.c_ytsave = function(user, args) {
         return;
     }
 
-    console.log('User', user.Name(), 'ytsave', hash, dest, ss, t);
+    console.log('User', user.Name, 'ytsave', hash, dest, ss, t);
     user.Send('Downloading ' + hash + ' as ' + args[1]);
 
     piepan.Process.New(function (success, data) {
@@ -458,7 +456,7 @@ commands.c_ytsave = function(user, args) {
 
 commands.h_mpc='Use MPC to control the local MPD server.'
 commands.c_mpc = function(user, args) {
-    console.log('User', user.Name(), 'mpc', args);
+    console.log('User', user.Name, 'mpc', args);
 
     var callback = function (success, data) {
         console.log(data);

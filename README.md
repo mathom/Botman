@@ -16,7 +16,7 @@ Usage
 
 Run like you would any other piepan bot:
 
-```piepan -username Botman -insecure=true -certificate botman.pem piepan.conf```
+```piepan -ffmpeg=avconv -username Botman -insecure=true -certificate botman.pem js:args.js js:bot.js```
 
 Note that you can specify `--channel` to make the bot join a specific channel.
 

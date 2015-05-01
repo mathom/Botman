@@ -201,7 +201,9 @@ function volume_clamp(val) {
 
 function set_volume(val) {
     current_volume = volume_clamp(val);
-    current.volume = current_volume;
+    if (current) {
+        current.volume = current_volume;
+    }
     piepan.Audio.SetVolume(current_volume);
 }
 
@@ -244,6 +246,9 @@ commands.c_queue = function(user, args) {
 
     var data = {user: user, volume: volume, filename: filename};
     if (interrupt) {
+        if (!piepan.Audio.IsPlaying()) {
+            return;
+        }
         data.interrupt = true;
         if (!current.interrupt) {
             playlist.unshift(current);

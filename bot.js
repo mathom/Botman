@@ -225,7 +225,8 @@ commands.h_queue='Queue a sound to play. See !playlist and !play.'
 commands.c_queue = function(user, args) {
     var volume = volume_clamp(config.default_volume);
     var interrupt = false;
-    var filename = 'sounds/' + args.shift() + '.ogg';
+    var file_arg = args.shift();
+    var filename = 'sounds/' + file_arg + '.ogg';
 
     var arg = args.shift();
     while (arg !== undefined) {
@@ -238,7 +239,10 @@ commands.c_queue = function(user, args) {
         arg = args.shift();
     }
 
-    if (!file_exists(filename)) {
+    if (file_arg == 'stream') {
+        filename = config.mpd_stream;
+    }
+    else if (!file_exists(filename)) {
         user.Send("Sound file does not exist!");
         return;
     }
@@ -262,7 +266,6 @@ commands.c_queue = function(user, args) {
             play_queue();
         }
     }
-
 }
 
 function play_queue() {
@@ -285,20 +288,12 @@ commands.c_queueclear = function(user, args) {
 
 commands.h_stream='Play the local MPD stream.'
 commands.c_stream = function(user, args) {
-    piepan.Audio.Stop();
     console.log('playing MPD stream');
     set_volume(config.default_volume);
-    piepan.Audio.Play({filename: config.mpd_stream});
+    commands.c_queue(user, ['stream']);
 }
 
 function play_soundfile(file, volume, user, at) {
-    if (!file_exists(file)) {
-        if (user.Send) {
-            user.Send("Sound file does not exist!");
-        }
-        return;
-    }
-
     if (at === undefined) {
         at = 0;
     }

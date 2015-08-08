@@ -73,7 +73,7 @@ piepan.On('message', function(e) {
         return;
     }
 
-    var msg = e.Message.replace(/&quot;/g, '"');
+    var msg = e.Message.replace(/&quot;/g, '"').replace(/<(?:.|\n)*?>/gm, '');
     var command_re = /^([+!@#])(\w+)?(.*)$/;
     var match = command_re.exec(msg);
     if (!match) {
@@ -188,7 +188,7 @@ commands.c_play = function(user, args) {
 commands.h_resume='Resume the last song that was stopped'
 commands.c_resume = function(user, args) {
     if (!piepan.Audio.IsPlaying() && last_stopped) {
-        console.log('User', user.Name, 'resuming playback of', last_stopped.filename);
+        console.log('User', user.Name, 'resuming playback of', last_stopped.filename, 'at', last_stopped.at);
         playlist.unshift(last_stopped);
         last_stopped = null;
         play_queue();
@@ -303,7 +303,7 @@ function play_soundfile(file, volume, user, at) {
     }
 
     piepan.Audio.SetVolume(volume);
-    piepan.Audio.Play({filename: file, callback: play_queue, startSeconds: at});
+    piepan.Audio.Play({filename: file, callback: play_queue, offset: at});
 }
 
 commands.h_queuelist='Display play queue. See !queue.'
@@ -527,15 +527,15 @@ function message_pre(user, data) {
     }
 }
 
-commands.h_ytsave='Download and save a Youtube (video ID) with a name.'
+commands.h_ytsave='Download and save a Youtube/Vimeo/etc URL with a name.'
 commands.c_ytsave = function(user, args) {
     var hash = args[0];
     var dest = 'sounds/' + args[1] + '.ogg';
     var ss = args[2];
     var t = args[3];
 
-    if (!hash || !hash.match(/[A-Za-z0-9_-]+/)) {
-        user.Send('First argument (hash) is malformed!');
+    if (!hash || !hash.match(/^https?:\/\/[^\s/$.?#].[^\s]*$/)) {
+        user.Send('First argument (URL) is malformed!');
         return;
     }
     if (!args[1] || !args[1].match(/[A-Za-z0-9_-]+/)) {
@@ -543,11 +543,11 @@ commands.c_ytsave = function(user, args) {
         return;
     }
     if (ss && !ss.match(/\d\d:\d\d:\d\d/)) {
-        user.Send('Second argument (start time) is malformed!');
+        user.Send('Third argument (start time) is malformed!');
         return;
     }
     if (t && !t.match(/\d\d:\d\d:\d\d/g)) {
-        user.Send('Second argument (duration) is malformed!');
+        user.Send('Fourth argument (duration) is malformed!');
         return;
     }
 

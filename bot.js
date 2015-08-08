@@ -534,7 +534,7 @@ commands.c_ytsave = function(user, args) {
     var ss = args[2];
     var t = args[3];
 
-    if (!hash || !hash.match(/^https?:\/\/[^\s/$.?#].[^\s]*$/)) {
+    if (!hash || !hash.match(/^(https?:\/\/[^\s/$.?#].[^\s]*|[A-Za-z0-9_-]+)$/)) {
         user.Send('First argument (URL) is malformed!');
         return;
     }

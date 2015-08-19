@@ -209,7 +209,7 @@ commands.c_info = function(user, args) {
     }
 
     if (current && !args[0]) {
-        args[0] = current.filename;
+        filename = current.filename;
     }
 
     console.log('User', user.Name, 'info', filename);

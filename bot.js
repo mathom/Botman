@@ -219,6 +219,42 @@ commands.c_info = function(user, args) {
     }, 'exiftool', '-h', '-title', '-artist', '-user', filename);
 }
 
+commands.h_tag='Set tags on a track (ex: tag filename artist Some Artist)'
+commands.c_tag = function(user, args) {
+    if (!args[0] || !args[0].match(/[A-Za-z0-9_-]+/)) {
+        user.Send('First argument (filename) is malformed!');
+        return;
+    }
+    var filename = 'sounds/' + args.shift() + '.ogg';
+
+    var allowed_modes = {
+        artist: '-a',
+        title: '-t'
+    };
+    var mode = allowed_modes[args.shift()];
+    if (!mode) {
+        user.Send('Second argument (must be "artist" or "title") is malformed!');
+        return;
+    }
+
+    var value = args.join(' ');
+    if (!value || !value.match(/[()A-Za-z0-9_ '-]+/)) {
+        user.Send('Third argument (value) is malformed!');
+        return;
+    }
+
+    console.log('User', user.Name, 'tag', filename, mode, value);
+
+    piepan.Process.New(function (success, data) {
+        user.Send(data);
+        piepan.Process.New(function (success, data) {
+            piepan.Process.New(function (success, data) {
+                user.Send('reimported into library');
+            }, 'beet', 'import', '-qCA', filename);
+        }, 'beet', 'remove', 'path::.+/' + filename);
+    }, 'lltag', '--yes', mode, value, filename);
+}
+
 commands.h_resume='Resume the last song that was stopped'
 commands.c_resume = function(user, args) {
     if (!piepan.Audio.IsPlaying() && last_stopped) {

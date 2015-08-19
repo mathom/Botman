@@ -7,9 +7,11 @@ extension="${1##*.}"
 
 if [[ "mp3 ogg m4a" =~ "$extension" ]]; then
     curl $1 > $AUDIO_OUT.$extension
+    DL_TITLE=$(basename $1)
 else
     extension="m4a"
     youtube-dl --socket-timeout 5 --extract-audio --audio-format m4a -o "$AUDIO_OUT.%(ext)s" -- $1
+    DL_TITLE=$(youtube-dl --socket-timeout 5 --get-title $1)
 fi
 if [ $? -eq 0 ]; then
     NAME=$AUDIO_OUT.$extension
@@ -30,6 +32,20 @@ if [ $? -eq 0 ]; then
 
     eval $COMMAND
     normalize-ogg $2
+    FILENAME=$(readlink -f $2)
+    if hash beet 2>/dev/null; then
+        if hash lltag 2>/dev/null; then
+            # for some reason beet won't write custom tags out
+            lltag -q --yes --tag user="$5" $FILENAME
+            echo "set user to $5"
+        fi
+        beet import -Csq $FILENAME
+        if [ -z "$(beet ls path:$FILENAME)" ]; then
+            echo "reimporting with title $DL_TITLE"
+            beet import -ACq $FILENAME # in case it doesnt have real tags...
+            beet modify -My path:$FILENAME title="$DL_TITLE"
+        fi
+    fi
     RET=$?
 fi
 

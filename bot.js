@@ -45,6 +45,7 @@ piepan.On('connect', function(e) {
             config[key] = default_config[key];
         }
     }
+    console.log('config', config);
 
     var fh = piepan.File.Open('resume.json','r');
     if (fh !== undefined) {
@@ -185,6 +186,39 @@ commands.c_play = function(user, args) {
     commands.c_queue(user, args);
 }
 
+commands.h_randplay='Playing a random track from the database.'
+commands.c_randplay = function(user, args) {
+    piepan.Process.New(function (success, data) {
+        console.log('data', data);
+        var match = /\/([A-Za-z0-9_-]+)\./.exec(data);
+        console.log('match', match);
+        if (match) {
+            var new_args = [match[1]];
+            commands.c_queue(user, new_args.concat(args));
+        }
+    }, 'beet', 'random', '-ep');
+}
+
+commands.h_info='Show info about the currently playing track.'
+commands.c_info = function(user, args) {
+    var filename = 'sounds/' + args[0] + '.ogg';
+
+    if (!current && !args[0].match(/[A-Za-z0-9_-]+/)) {
+        user.Send('First argument (filename) is malformed!');
+        return;
+    }
+
+    if (current && !args[0]) {
+        args[0] = current.filename;
+    }
+
+    console.log('User', user.Name, 'info', filename);
+
+    piepan.Process.New(function (success, data) {
+        user.Send(data);
+    }, 'exiftool', '-h', '-title', '-artist', '-user', filename);
+}
+
 commands.h_resume='Resume the last song that was stopped'
 commands.c_resume = function(user, args) {
     if (!piepan.Audio.IsPlaying() && last_stopped) {
@@ -283,6 +317,7 @@ function play_queue() {
 commands.h_queueclear='Clear the play queue. See !queue.'
 commands.c_queueclear = function(user, args) {
     playlist = [];
+        console.log(user.Name, 'listing', directory, 'filtering by', filter);
     commands.c_stop(user, args);
 }
 
@@ -562,7 +597,7 @@ commands.c_ytsave = function(user, args) {
         else {
             user.Send('Saved new sound to ' + args[1]);
         }
-    }, '/bin/bash', 'youtube_dl.sh', hash, dest, ss, t);
+    }, '/bin/bash', 'youtube_dl.sh', hash, dest, ss, t, user.Name);
 }
 
 commands.h_mpc='Use MPC to control the local MPD server.'

@@ -27,7 +27,7 @@ var shortcuts = {
 };
 
 piepan.On('connect', function(e) {
-    if (!config) {
+    if (typeof config === 'undefined') {
         config = {};
     }
 

@@ -196,7 +196,7 @@ commands.c_randplay = function(user, args) {
             var new_args = [match[1]];
             commands.c_queue(user, new_args.concat(args));
         }
-    }, 'beet', 'random', '-ep');
+    }, 'beet', 'random', '-p');
 }
 
 commands.h_info='Show info about the currently playing track.'
@@ -297,20 +297,28 @@ commands.c_queue = function(user, args) {
     var interrupt = false;
     var file_arg = args.shift();
     var filename = 'sounds/' + file_arg + '.ogg';
+    var stream_url;
 
     var arg = args.shift();
     while (arg !== undefined) {
         if (arg == 'interrupt') {
             interrupt = true;
         }
-        else {
+        else if (file_arg != 'stream') {
             volume = volume_clamp(parseFloat(arg));
+        }
+        else {
+            stream_url = arg;
         }
         arg = args.shift();
     }
 
     if (file_arg == 'stream') {
-        filename = config.mpd_stream;
+        if (stream_url !== undefined) {
+            filename = stream_url;
+        } else {
+            filename = config.mpd_stream;
+        }
     }
     else if (!file_exists(filename)) {
         user.Send("Sound file does not exist!");
@@ -361,7 +369,7 @@ commands.h_stream='Play the local MPD stream.'
 commands.c_stream = function(user, args) {
     console.log('playing MPD stream');
     set_volume(config.default_volume);
-    commands.c_queue(user, ['stream']);
+    commands.c_queue(user, ['stream'].concat(args));
 }
 
 function play_soundfile(file, volume, user, at) {

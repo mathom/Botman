@@ -9,8 +9,9 @@ if [[ "mp3 ogg m4a" =~ "$extension" ]]; then
     curl $1 > $AUDIO_OUT.$extension
     DL_TITLE=$(basename $1)
 else
-    extension="m4a"
-    youtube-dl --socket-timeout 5 --extract-audio --audio-format m4a -o "$AUDIO_OUT.%(ext)s" -- $1
+    extension="ogg"
+    echo youtube-dl --socket-timeout 5 --extract-audio --audio-format vorbis -o "$AUDIO_OUT.%(ext)s" -- $1
+    youtube-dl --socket-timeout 5 --extract-audio --audio-format vorbis -o "$AUDIO_OUT.%(ext)s" -- $1
     DL_TITLE=$(youtube-dl --socket-timeout 5 --get-title $1)
 fi
 if [ $? -eq 0 ]; then
@@ -34,6 +35,7 @@ if [ $? -eq 0 ]; then
     normalize-ogg $2
     FILENAME=$(readlink -f $2)
     if hash beet 2>/dev/null; then
+        beet remove path:$FILENAME
         if hash lltag 2>/dev/null; then
             # for some reason beet won't write custom tags out
             lltag -q --yes --tag user="$5" $FILENAME

@@ -1,7 +1,9 @@
 CoolDudesBot
 ============
 
-A [piepan](https://github.com/layeh/piepan) script to provide useful and fun features for your Mumble server.
+Formerly a [piepan](https://github.com/mathom/piepan) script to provide useful and fun features for your Mumble server.
+
+Becuase piepan has pulled JS support I've forked the project at the last compatible version. I'll be porting to [node-mumble](https://github.com/Rantanen/node-mumble) soon.
 
 Installation
 ------------

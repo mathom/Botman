@@ -6,6 +6,7 @@
     "homepage": "https://github.com/mathom/CoolDudesBot",
     "bugs": "https://github.com/mathom/CoolDudesBot/issues",
     "license": "MIT",
+    "bin": { "botman": "./newbot.js" },
     "repository": {
         "type": "git",
         "url": "http://github.com/mathom/CoolDudesBot.git"

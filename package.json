@@ -1,0 +1,22 @@
+{
+    "name": "cooldudesbot",
+    "description": "A customizable bot and soundboard for mumble",
+    "version": "0.0.1",
+    "author": "Matt Thompson <chameleonator@gmail.com>",
+    "homepage": "https://github.com/mathom/CoolDudesBot",
+    "bugs": "https://github.com/mathom/CoolDudesBot/issues",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "http://github.com/mathom/CoolDudesBot.git"
+    },
+    "engines": {
+        "node": ">=0.10.0"
+    },
+    "dependencies": {
+        "mumble": "0.3.7",
+        "vorbis": "0.1.1",
+        "ogg": "1.2.1",
+        "striptags": "2.1.1"
+    }
+}

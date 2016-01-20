@@ -1,12 +1,65 @@
+#!/usr/bin/env node
+
+"use strict";
+
+var mumble = require('mumble');
+var ogg = require('ogg');
+var vorbis = require('vorbis');
+var fs = require('fs');
+var striptags = require('striptags');
+var stream = require('stream');
+var util = require('util');
+var buffer = require('buffer');
+var R = require('ramda');
+
+var argv = require('yargs')
+    .usage('Usage: $0 [options] [script1 script2 ...]')
+    .alias('s', 'server')
+    .describe('s', 'Connect to server')
+    .alias('c', 'command')
+    .describe('c', 'Run a command when started')
+    .help('h')
+    .alias('h', 'help')
+    .argv;
+
+var config = {};
+
+class Bot {
+    constructor(config, connection) {
+        this.connection = connection;
+        this.config = config;
+        this.channel = null;
+        this.audioInput = null;
+        this.volume = null;
+    };
+
+    whisper(username, message) {
+        this.connection.userByName(username).sendMessage(message);
+    };
+
+    get isPlaying() {
+        return this.audioInput !== null;
+    };
+
+    stopPlaying() {
+        if (this.audioInput !== null) {
+            this.audioInput.close();
+            this.audioInput = null;
+        }
+    };
+}
+
+var bot = undefined;
+
 var commands = {};
-var responses = {};
 var playlist = [];
-var themes = {};
 var current = null;
 var last_stopped = null;
 var current_volume;
 
 var default_config = {
+    name: 'Botman',
+    server: 'mumble://127.0.0.1',
     default_volume: 2.5,
     message_max: 5000,
     mpd_stream: 'http://localhost:6601'
@@ -22,59 +75,55 @@ var shortcuts = {
     ls: 'playlist',
     v: 'volume',
     vd: 'volumedefault',
-    m: 'mpc',
-    r: 'resume'
+    m: 'mpc'
 };
 
-piepan.On('connect', function(e) {
-    if (typeof config === 'undefined') {
-        config = {};
-    }
 
-    if (config.channel) {
-        console.log('Joining channel', config.channel);
-        for (var p in piepan.Channels) {
-            if (piepan.Channels[p].Name == config.channel) {
-                piepan.Self.Move(piepan.Channels[p]);
+function connect() {
+    // load all extension/config scripts
+    var scripts = R.map(x => require(__dirname + '/' + x), argv._);
+
+    // merge all configs in order (with defaults first in case things are missing)
+    config = R.mergeAll(R.prepend(default_config, R.map(R.propOr({}, 'config'), scripts)));
+
+    // merge all commands in order
+    commands = R.mergeAll(R.prepend(commands, R.map(R.propOr({}, 'commands'), scripts)));
+
+    // get all args that are longer than two (yargs has aliases) and merge them with the config
+    var flags = R.filter(function(x) { return x.length>2; }, R.keys(argv));
+    config = R.merge(config, R.pick(flags, argv));
+
+    mumble.connect(config.server, config.tls, function(error, connection) {
+        if (error) { throw new Error(error); }
+
+        connection.on('initialized', function() {
+            console.log('Connected successfully');
+            bot = new Bot(config, connection);
+
+            connection.on('message', on_message);
+            connection.on('move', function(oldChannel, newChannel) {
+                bot.channel = newChannel;
+            });
+
+            if (config.channel) {
+                console.log('Joining channel', config.channel);
+                connection.channelByName(config.channel).join();
             }
-        }
-    }
 
-    for (var key in default_config) {
-        if (!config[key]) {
-            config[key] = default_config[key];
-        }
-    }
-    console.log('config', config);
+            if (config.command) { // run init command if specified
+                console.log('running', config.command, 'from user', connection.user.name);
+                on_message(config.command, connection.user);
+            }
+        });
 
-    var fh = piepan.File.Open('resume.json','r');
-    if (fh !== undefined) {
-        console.log('reading system state from resume.json');
-        var data = JSON.parse(fh.Read());
-        if (data) {
-            playlist = data.playlist;
-            current = data.current;
-            last_stopped = data.last_stopped;
-            current_volume = data.current_volume;
-            play_queue();
-        }
-        fh.Close();
-        fh = piepan.File.Open('resume.json','w+');
-        fh.Close();
-    }
-});
+        connection.authenticate(config.name, config.password);
+    });
+}
 
-piepan.On('disconnect', function(e) {
-    c_suspend({Name:'system'});
-});
+function on_message(message, user, scope) {
+    console.log(user.name, 'said', message);
 
-piepan.On('message', function(e) {
-    if (e.Sender == null) {
-        //console.log('ignoring message from null sender');
-        return;
-    }
-
-    var msg = e.Message.replace(/&quot;/g, '"').replace(/<(?:.|\n)*?>/gm, '');
+    var msg = striptags(message.replace(/&quot;/g, '"'));
     var command_re = /^([+!@#])(\w+)?(.*)$/;
     var match = command_re.exec(msg);
     if (!match) {
@@ -105,7 +154,7 @@ piepan.On('message', function(e) {
     }
 
     var args = rest.match(/"[^"]*"|[^\s"]+/g);
-    if (args !== undefined) {
+    if (args !== null) {
         for (var i=0; i<args.length; i++) {
             var str = args[i];
             if (str.charAt(0) === '"' && str.charAt(str.length -1) === '"')
@@ -123,34 +172,7 @@ piepan.On('message', function(e) {
     }
 
     if (commands['c_' + command]) {
-        commands['c_' + command](e.Sender, args);
-    }
-});
-
-commands.h_suspend='Save the current playback state.';
-commands.c_suspend = function(user, args) {
-    commands.c_stop(user);
-
-    var data = JSON.stringify({
-        playlist: playlist,
-        current: current,
-        last_stopped: last_stopped,
-        current_volume: current_volume
-    }, function(key, val) {
-        // User objects need to be stripped out
-        if (key == 'user') {
-            return {Name: val.Name};
-        }
-        else {
-            return val;
-        }
-    });
-
-    var fh = piepan.File.Open('resume.json','w');
-    console.log('User', user.Name, 'saving system state to resume.json');
-    if (fh !== undefined) {
-        fh.Write(data);
-        fh.Close()
+        commands['c_' + command](user, args);
     }
 }
 
@@ -165,17 +187,17 @@ commands.c_help = function(user, args) {
         }
     }
     result.sort();
-    user.Send('Available commands:<br/>' + result.join('<br/>'));
+    user.sendMessage('Available commands:<br/>' + result.join('<br/>'));
 }
 
 commands.h_stop='Stop playing sound. Use !resume to resume.'
 commands.c_stop = function(user, args) {
-    if (piepan.Audio.IsPlaying()) {
-        var at = piepan.Audio.Stop();
+    if (bot.isPlaying) {
+        var at = bot.stopPlaying();
         if (!current.interrupt && (!args || args[0] === undefined)) {
             last_stopped = current;
             last_stopped.at = at;
-            console.log('User', user.Name, 'stopped', current.filename, 'at', at);
+            console.log('User', user.name, 'stopped', current.filename, 'at', at);
         }
         current = null;
     }
@@ -188,15 +210,41 @@ commands.c_play = function(user, args) {
 
 commands.h_randplay='Playing a random track from the database.'
 commands.c_randplay = function(user, args) {
-    piepan.Process.New(function (success, data) {
-        console.log('data', data);
-        var match = /\/([A-Za-z0-9_-]+)\./.exec(data);
-        console.log('match', match);
+    spawn_cmd('beet', ['random', '-p'], (error, stdout) => {
+        var match = /\/([A-Za-z0-9_-]+)\./.exec(stdout);
         if (match) {
             var new_args = [match[1]];
             commands.c_queue(user, new_args.concat(args));
         }
-    }, 'beet', 'random', '-p');
+    });
+}
+
+function spawn_cmd(bin, args, callback) {
+    var StringDecoder = require('string_decoder').StringDecoder;
+
+    var ps = require('child_process').spawn(bin, args);
+
+    var stdout = new StringDecoder('utf8');
+    var stdoutStrings = [];
+    var stderr = new StringDecoder('utf8');
+    var stderrStrings = [];
+
+    ps.stdout.on('data', (data) => {
+        stdoutStrings.push(stdout.write(data));
+    });
+
+    ps.stderr.on('data', (data) => {
+        stderrStrings.push(stderr.write(data));
+    });
+
+    ps.on('close', (code) => {
+        var error = code !== 0;
+
+        stderrStrings.push(stderr.end());
+        stdoutStrings.push(stdout.end());
+
+        callback(error, stdoutStrings.join(''), stderrStrings.join(''), code);
+    });
 }
 
 commands.h_info='Show info about the currently playing track.'
@@ -204,7 +252,7 @@ commands.c_info = function(user, args) {
     var filename = 'sounds/' + args[0] + '.ogg';
 
     if (!current && !args[0].match(/[A-Za-z0-9_-]+/)) {
-        user.Send('First argument (filename) is malformed!');
+        user.sendMessage('First argument (filename) is malformed!');
         return;
     }
 
@@ -212,17 +260,19 @@ commands.c_info = function(user, args) {
         filename = current.filename;
     }
 
-    console.log('User', user.Name, 'info', filename);
+    console.log('User', user.name, 'info', filename);
 
-    piepan.Process.New(function (success, data) {
-        user.Send(data);
-    }, 'exiftool', '-h', '-title', '-artist', '-user', filename);
+    spawn_cmd('exiftool', [
+        '-h', '-title', '-artist', '-user', filename
+    ], function(error, stdout) {
+        user.sendMessage(stdout);
+    });
 }
 
 commands.h_tag='Set tags on a track (ex: tag filename artist Some Artist)'
 commands.c_tag = function(user, args) {
     if (!args[0] || !args[0].match(/[A-Za-z0-9_-]+/)) {
-        user.Send('First argument (filename) is malformed!');
+        user.sendMessage('First argument (filename) is malformed!');
         return;
     }
     var filename = 'sounds/' + args.shift() + '.ogg';
@@ -233,32 +283,32 @@ commands.c_tag = function(user, args) {
     };
     var mode = allowed_modes[args.shift()];
     if (!mode) {
-        user.Send('Second argument (must be "artist" or "title") is malformed!');
+        user.sendMessage('Second argument (must be "artist" or "title") is malformed!');
         return;
     }
 
     var value = args.join(' ');
     if (!value || !value.match(/[()A-Za-z0-9_ '-]+/)) {
-        user.Send('Third argument (value) is malformed!');
+        user.sendMessage('Third argument (value) is malformed!');
         return;
     }
 
-    console.log('User', user.Name, 'tag', filename, mode, value);
+    console.log('User', user.name, 'tag', filename, mode, value);
 
-    piepan.Process.New(function (success, data) {
-        user.Send(data);
-        piepan.Process.New(function (success, data) {
-            piepan.Process.New(function (success, data) {
-                user.Send('reimported into library');
-            }, 'beet', 'import', '-qCA', filename);
-        }, 'beet', 'remove', 'path::.+/' + filename);
-    }, 'lltag', '--yes', mode, value, filename);
+    spawn_cmd('lltag', ['--yes', mode, value, filename], (error, data) => {
+        user.sendMessage(data);
+        spawn_cmd('beet', ['remove', 'path::.+/'+filename], (error, data) => {
+            spawn_cmd('beet', ['import', '-qCA', filename], (error, data) => {
+                user.sendMessage('reimported into library');
+            });
+        });
+    });
 }
 
 commands.h_resume='Resume the last song that was stopped'
 commands.c_resume = function(user, args) {
-    if (!piepan.Audio.IsPlaying() && last_stopped) {
-        console.log('User', user.Name, 'resuming playback of', last_stopped.filename, 'at', last_stopped.at);
+    if (!bot.isPlaying && last_stopped) {
+        console.log('User', user.name, 'resuming playback of', last_stopped.filename, 'at', last_stopped.at);
         playlist.unshift(last_stopped);
         last_stopped = null;
         play_queue();
@@ -274,7 +324,7 @@ function set_volume(val) {
     if (current) {
         current.volume = current_volume;
     }
-    piepan.Audio.SetVolume(current_volume);
+    bot.volume = current_volume;
 }
 
 commands.h_volume='Set output volume to specified value.'
@@ -282,7 +332,7 @@ commands.c_volume = function(user, args) {
     if (args[0])
         set_volume(parseFloat(args[0]));
     else
-        user.Send('Current volume: ' + current_volume);
+        user.sendMessage('Current volume: ' + current_volume);
 }
 
 commands.h_volumedefault='Set default output volume to specified value.'
@@ -296,7 +346,7 @@ commands.c_queue = function(user, args) {
     var volume = volume_clamp(config.default_volume);
     var interrupt = false;
     var file_arg = args.shift();
-    var filename = 'sounds/' + file_arg + '.ogg';
+    var filename = __dirname + '/sounds/' + file_arg + '.ogg';
     var stream_url;
 
     var arg = args.shift();
@@ -321,14 +371,14 @@ commands.c_queue = function(user, args) {
         }
     }
     else if (!file_exists(filename)) {
-        user.Send("Sound file does not exist!");
+        user.sendMessage("Sound file does not exist!");
         return;
     }
-    console.log('User', user.Name, 'playing', filename);
+    console.log('User', user.name, 'playing', filename);
 
     var data = {user: user, volume: volume, filename: filename};
     if (interrupt) {
-        if (!piepan.Audio.IsPlaying()) {
+        if (!bot.isPlaying) {
             return;
         }
         data.interrupt = true;
@@ -336,11 +386,11 @@ commands.c_queue = function(user, args) {
             playlist.unshift(current);
         }
         playlist.unshift(data);
-        current.at = piepan.Audio.Stop();
+        current.at = bot.stopPlaying();
     }
     else {
         playlist.push(data);
-        if (!piepan.Audio.IsPlaying()) {
+        if (!bot.output) {
             play_queue();
         }
     }
@@ -361,7 +411,7 @@ function play_queue() {
 commands.h_queueclear='Clear the play queue. See !queue.'
 commands.c_queueclear = function(user, args) {
     playlist = [];
-        console.log(user.Name, 'listing', directory, 'filtering by', filter);
+        console.log(user.name, 'listing', directory, 'filtering by', filter);
     commands.c_stop(user, args);
 }
 
@@ -372,17 +422,66 @@ commands.c_stream = function(user, args) {
     commands.c_queue(user, ['stream'].concat(args));
 }
 
+function float_to_int(options) {
+    stream.Transform.call(this, options);
+}
+util.inherits(float_to_int, stream.Transform);
+
+float_to_int.prototype._transform = function (chunk, enc, cb) {
+    var b = new buffer.Buffer(chunk.length/4 * 2);
+    for (var i=0, j=0; i<chunk.length; i+=4,j+=2) {
+        var f = chunk.readFloatLE(i);
+        f = f * 32768;
+        if (f > 32767) f = 32767;
+        if (f < -32768) f = -32768;
+
+        b.writeInt16LE(Math.floor(f), j);
+    }
+    this.push(b);
+    cb();
+};
+
 function play_soundfile(file, volume, user, at) {
     if (at === undefined) {
         at = 0;
     }
 
-    if (piepan.Audio.IsPlaying()) {
-        piepan.Audio.Stop();
+    if (bot.isPlaying) {
+        bot.stopPlaying();
     }
 
-    piepan.Audio.SetVolume(volume);
-    piepan.Audio.Play({filename: file, callback: play_queue, offset: at});
+    set_volume(volume);
+    var od = new ogg.Decoder();
+    var tform = new float_to_int();
+    od.on('stream', function(stream) {
+        var vd = new vorbis.Decoder();
+        vd.on('format', function(format) {
+            bot.audioInput = bot.connection.inputStream({
+                channels: format.channels,
+                sampleRate: format.sampleRate,
+                bitDepth: 16, //format.bitDepth,
+                signed: format.signed,
+                gain: volume
+            });
+            vd.pipe(tform).pipe(bot.audioInput);
+        });
+        vd.on('end', function() {
+            bot.stopPlaying();
+            play_queue();
+        });
+        vd.on('error', function(e) {
+            console.error(e);
+            bot.stopPlaying();
+        });
+
+        stream.pipe(vd);
+    });
+    od.on('error', function(e) {
+        console.error(e);
+        bot.stopPlaying();
+    });
+
+    fs.createReadStream(file).pipe(od);
 }
 
 commands.h_queuelist='Display play queue. See !queue.'
@@ -394,26 +493,25 @@ commands.c_queuelist = function(user, args) {
     }
     if (current) {
         var match = /^sounds\/(.+).ogg$/.exec(current.filename);
-        user.Send('Currently playing: ' + match[1])
+        user.sendMessage('Currently playing: ' + match[1])
     }
 
     if (lines.length) {
-        user.Send('Queued sounds:<br/>' + lines.join('<br/>'));
+        user.sendMessage('Queued sounds:<br/>' + lines.join('<br/>'));
     }
     else {
-        user.Send('Queue empty!');
+        user.sendMessage('Queue empty!');
     }
 }
 
 function file_exists(file) {
-    var fh = piepan.File.Open(file,'r');
-    if (fh !== undefined) {
-        fh.Close();
+    try {
+        fs.lstatSync(file);
         return true;
+    } catch (e) {
+        console.error(e);
     }
-    else {
-        return false;
-    }
+    return false;
 }
 
 function randint (min, max) {
@@ -425,7 +523,7 @@ commands.c_playlist = function(user, args) {
     var directory = 'sounds';
 
     function print_page(num, lines) {
-        user.Send('Sound files (' + num + '):<br/>' + lines.join('<br/>'));
+        user.sendMessage('Sound files (' + num + '):<br/>' + lines.join('<br/>'));
     }
 
     var pages = -1;
@@ -450,16 +548,16 @@ commands.c_playlist = function(user, args) {
     var filter = args.shift();
 
     if (filter) {
-        console.log(user.Name, 'listing', directory, 'filtering by', filter);
+        console.log(user.name, 'listing', directory, 'filtering by', filter);
     }
     else {
-        console.log(user.Name, 'listing', directory);
+        console.log(user.name, 'listing', directory);
     }
 
     var num_rand = 10;
 
-    piepan.Process.New(function (success, data) {
-        if (!success) return;
+    spawn_cmd('/bin/ls', [flags, directory], (error, data) => {
+        if (error) return;
         var match_re = /(.+) (.+)/g;
         var match;
 
@@ -505,87 +603,8 @@ commands.c_playlist = function(user, args) {
                 lines.sort();
             print_page(page, lines);
         }
-    }, '/bin/ls', flags, directory);
+    });
 }
-/*
-commands.h_say='Speak your message aloud.'
-commands.c_say = function(user, args) {
-    var cargs = '';
-    var mode = 'pico';
-    var pitch_flag = ' -p ';
-    var speed_flag = ' -s ';
-
-    if (user.UserID == 14 || user.UserID == 46) {
-        return;
-    }
-
-    if (args[0] == 'c64') {
-        mode = 'sam'
-        pitch_flag = ' -pitch '
-        speed_flag = ' -speed '
-        args.shift();
-    }
-    if (args[0] == 'espeak') {
-        mode = 'espeak';
-        args.shift();
-    }
-
-    var sargs = args[0];
-
-    var matches = {
-        /p(%d+)/: pitch_flag,
-        /s(%d+)/: speed_flag,
-        /v'(.+)'/: ' -v ',
-        /t(%d+)/: ' -throat ',
-        /m(%d+)/: ' -mouth '
-    };
-
-    for (var re in matches) {
-        var match = re.exec(sargs);
-        if (match) {
-            cargs = cargs + matches[re] + match[1];
-        }
-    }
-
-    if (cargs) args.shift();
-
-    var input = '/tmp/say.wav';
-    // var message = table.concat(args, ' '):gsub("[^a-zA-Z0-9,\'-\\!. #:]","\\%1");
-    console.log('User', user.Name, 'is saying', message);
-    switch (mode) {
-        case 'espeak':
-            command = 'espeak ' + cargs + ' -w ' + input + ' "' + message + '"';
-            break;
-        case 'sam':
-            command = 'sam ' + cargs + ' -wav ' + input + ' "' + message + '"';
-            break;
-        case 'pico':
-            command = 'pico2wave ' + ' -w ' + input + ' "' + message + '"';
-            break;
-    }
-    console.log('User', user.Name, 'is running:', command);
-
-
-    rval, rtype = os.execute(command)
-
-    if rtype ~= 'exit' or not rval then
-        user:send('Error speaking!')
-        return
-    end
-
-    local out = '/tmp/say.ogg'
-    os.remove(out)
-    command = 'avconv -i ' .. input .. ' -ac 1 -ar 44100 -codec:a libvorbis ' .. out
-    rval, rtype = os.execute(command)
-
-    if rtype ~= 'exit' or not rval then
-        user:send('Error converting audio! ' .. rval .. ' ' .. rtype)
-        return
-    end
-
-    play_soundfile(out, 1.0, user)
-    }
-*/
 
 function message_pre(user, data) {
     var m = config.message_max - '<pre></pre>'.length;
@@ -602,7 +621,7 @@ function message_pre(user, data) {
     }
 
     for (var i=0; i<splits.length; i++) {
-        user.Send('<pre>' + data.substring(splits[i][0], splits[i][1]) + '</pre>');
+        user.sendMessage('<pre>' + data.substring(splits[i][0], splits[i][1]) + '</pre>');
     }
 }
 
@@ -614,48 +633,46 @@ commands.c_ytsave = function(user, args) {
     var t = args[3];
 
     if (!hash || !hash.match(/^(https?:\/\/[^\s/$.?#].[^\s]*|[A-Za-z0-9_-]+)$/)) {
-        user.Send('First argument (URL) is malformed!');
+        user.sendMessage('First argument (URL) is malformed!');
         return;
     }
     if (!args[1] || !args[1].match(/[A-Za-z0-9_-]+/)) {
-        user.Send('Second argument (name) is malformed!');
+        user.sendMessage('Second argument (name) is malformed!');
         return;
     }
     if (ss && !ss.match(/\d\d:\d\d:\d\d/)) {
-        user.Send('Third argument (start time) is malformed!');
+        user.sendMessage('Third argument (start time) is malformed!');
         return;
     }
     if (t && !t.match(/\d\d:\d\d:\d\d/g)) {
-        user.Send('Fourth argument (duration) is malformed!');
+        user.sendMessage('Fourth argument (duration) is malformed!');
         return;
     }
 
-    console.log('User', user.Name, 'ytsave', hash, dest, ss, t);
-    user.Send('Downloading ' + hash + ' as ' + args[1]);
+    console.log('User', user.name, 'ytsave', hash, dest, ss, t);
+    user.sendMessage(`Downloading ${hash} as ${args[1]}`);
 
-    piepan.Process.New(function (success, data) {
-        console.log(data);
-        if (!success) {
-            user.Send('Could not download: ' + data);
+    spawn_cmd('/bin/bash', [
+            'youtube_dl.sh', hash, dest, ss, t, user.name
+    ], (error, stdout, stderr) => {
+        console.log(stdout);
+        if (error) {
+            user.sendMessage(`Could not download: ${stdout} ${stderr}`);
         }
         else {
-            user.Send('Saved new sound to ' + args[1]);
+            user.sendMessage(`Saved new sound to ${args[1]}`);
         }
-    }, '/bin/bash', 'youtube_dl.sh', hash, dest, ss, t, user.Name);
+    });
 }
 
 commands.h_mpc='Use MPC to control the local MPD server.'
 commands.c_mpc = function(user, args) {
-    console.log('User', user.Name, 'mpc', args);
+    console.log('User', user.name, 'mpc', args);
 
-    var callback = function (success, data) {
+    spawn_cmd('/usr/bin/mpc', args, (error, data) => {
         console.log(data);
-        //user.Send('<pre>' + data + '</pre>');
         message_pre(user, data);
-    };
-    args.unshift('/usr/bin/mpc');
-    args.unshift(callback);
-    piepan.Process.New.apply(null, args);
+    });
 
     if (args[2] == 'play') {
         console.log('playing stream');
@@ -663,3 +680,4 @@ commands.c_mpc = function(user, args) {
     }
 }
 
+connect()

@@ -1,26 +1,53 @@
 Botman
 =======
 
-Formerly a [piepan](https://github.com/mathom/piepan) script to provide useful and fun features for your Mumble server.
+A simple bot to provide administration or multimedia on Mumble servers.
 
-Becuase piepan has pulled JS support I've forked the project at the last compatible version. I'll be porting to [node-mumble](https://github.com/Rantanen/node-mumble) soon.
+Requirements
+------------
+
+ * nodeenv (install with pip)
+ * exiftool (from libimage-exiftool-perl)
+ * normalize-ogg (from normalize-audio)
+ * avconv (ffmpeg)
+ * [youtube-dl](https://rg3.github.io/youtube-dl)
+ * [beets](https://github.com/beetbox/beets)
+
+You can install all of these with the following on Ubuntu:
+```
+sudo apt-get install youtube-dl libav-tools normalize-audio beets libimage-exiftool-perl python-pip
+```
+
+You'll also want to install nodeenv if you don't have it:
+```
+sudo pip install nodeenv
+```
 
 Installation
 ------------
 
-Build a copy of [piepan](https://github.com/layeh/piepan) for yourself.
-Install the required command line tools:
+Set up a nodeenv for 4.2.4 and activate it:
+```
+nodeenv --node=4.2.4 --prebuilt botmanenv
+source ./env/bin/activate
+```
 
-```sudo apt-get install youtube-dl libav-tools normalize-audio```
+Install the node modules for Botman:
+```
+npm install
+```
+
+Take a peek in `config_example.js` and set up a config file for yourself.
+
+Config options can also be specified on the command line. Run `./bot.js --help` to see some.
 
 Usage
 -----
 
-Run like you would any other piepan bot:
-
-```piepan -ffmpeg=avconv -username Botman -insecure=true -certificate botman.pem js:args.js js:bot.js```
-
-Note that you can specify `--channel` to make the bot join a specific channel.
+Simply run the bot script and any other extensions or configs you want:
+```
+./bot.js --server 127.0.0.1 --name MyBot --command "@helloworld" --channel "my channel"
+```
 
 Type `!help` in the chat for a list of commands. You can whisper them to the bot as well,
 but be sure to send regular text and not HTML.

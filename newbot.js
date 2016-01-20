@@ -24,28 +24,30 @@ var argv = require('yargs')
 
 var config = {};
 
-function Bot(config, connection) {
-    this.connection = connection;
-    this.config = config;
-    this.channel = null;
-    this.audioInput = null;
-    this.volume = null;
-}
-
-Bot.prototype.whisper = function(username, message) {
-    this.connection.userByName(username).sendMessage(message);
-};
-
-Bot.prototype.isPlaying = function() {
-    return this.audioInput !== null;
-};
-
-Bot.prototype.stopPlaying = function() {
-    if (this.audioInput !== null) {
-        this.audioInput.close();
+class Bot {
+    constructor(config, connection) {
+        this.connection = connection;
+        this.config = config;
+        this.channel = null;
         this.audioInput = null;
-    }
-};
+        this.volume = null;
+    };
+
+    whisper(username, message) {
+        this.connection.userByName(username).sendMessage(message);
+    };
+
+    get isPlaying() {
+        return this.audioInput !== null;
+    };
+
+    stopPlaying() {
+        if (this.audioInput !== null) {
+            this.audioInput.close();
+            this.audioInput = null;
+        }
+    };
+}
 
 var bot = undefined;
 
@@ -79,7 +81,7 @@ var shortcuts = {
 
 function connect() {
     // load all extension/config scripts
-    var scripts = R.map(function(x) { return require(__dirname + '/' + x); }, argv._);
+    var scripts = R.map(x => require(__dirname + '/' + x), argv._);
 
     // merge all configs in order (with defaults first in case things are missing)
     config = R.mergeAll(R.prepend(default_config, R.map(R.propOr({}, 'config'), scripts)));
@@ -190,7 +192,7 @@ commands.c_help = function(user, args) {
 
 commands.h_stop='Stop playing sound. Use !resume to resume.'
 commands.c_stop = function(user, args) {
-    if (bot.isPlaying()) {
+    if (bot.isPlaying) {
         var at = bot.stopPlaying();
         if (!current.interrupt && (!args || args[0] === undefined)) {
             last_stopped = current;
@@ -208,15 +210,13 @@ commands.c_play = function(user, args) {
 
 commands.h_randplay='Playing a random track from the database.'
 commands.c_randplay = function(user, args) {
-    piepan.Process.New(function (success, data) {
-        console.log('data', data);
-        var match = /\/([A-Za-z0-9_-]+)\./.exec(data);
-        console.log('match', match);
+    child_process.exec('beet random -p', function(error, stdout, stderr) {
+        var match = /\/([A-Za-z0-9_-]+)\./.exec(stdout);
         if (match) {
             var new_args = [match[1]];
             commands.c_queue(user, new_args.concat(args));
         }
-    }, 'beet', 'random', '-p');
+    });
 }
 
 commands.h_info='Show info about the currently playing track.'
@@ -234,9 +234,12 @@ commands.c_info = function(user, args) {
 
     console.log('User', user.name, 'info', filename);
 
-    piepan.Process.New(function (success, data) {
-        bot.whisper(user, data);
-    }, 'exiftool', '-h', '-title', '-artist', '-user', filename);
+    var child = child_process.spawn('exiftool', [
+        '-h', '-title', '-artist', '-user', filename
+    ]);
+    child.stdout.on('data', function(chunk) {
+        bot.whisper(user, chunk.toString('utf8'));
+    });
 }
 
 commands.h_tag='Set tags on a track (ex: tag filename artist Some Artist)'
@@ -277,7 +280,7 @@ commands.c_tag = function(user, args) {
 
 commands.h_resume='Resume the last song that was stopped'
 commands.c_resume = function(user, args) {
-    if (!bot.isPlaying() && last_stopped) {
+    if (!bot.isPlaying && last_stopped) {
         console.log('User', user.name, 'resuming playback of', last_stopped.filename, 'at', last_stopped.at);
         playlist.unshift(last_stopped);
         last_stopped = null;
@@ -348,7 +351,7 @@ commands.c_queue = function(user, args) {
 
     var data = {user: user, volume: volume, filename: filename};
     if (interrupt) {
-        if (!bot.isPlaying()) {
+        if (!bot.isPlaying) {
             return;
         }
         data.interrupt = true;
@@ -416,7 +419,7 @@ function play_soundfile(file, volume, user, at) {
         at = 0;
     }
 
-    if (bot.isPlaying()) {
+    if (bot.isPlaying) {
         bot.stopPlaying();
     }
 

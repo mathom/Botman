@@ -12,12 +12,12 @@
         "url": "http://github.com/mathom/CoolDudesBot.git"
     },
     "engines": {
-        "node": ">=0.10.0"
+        "node": ">=4.0.0"
     },
     "dependencies": {
         "mumble": "0.3.7",
-        "vorbis": "0.1.1",
-        "ogg": "1.2.1",
+        "vorbis": "git://git@github.com:mathom/node-vorbis.git#nan210",
+        "ogg": "1.2.2",
         "striptags": "2.1.1",
         "ramda": "0.19.1",
         "yargs": "3.32.0"

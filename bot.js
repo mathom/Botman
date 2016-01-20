@@ -488,11 +488,11 @@ commands.h_queuelist='Display play queue. See !queue.'
 commands.c_queuelist = function(user, args) {
     var lines = [];
     for (var i=0; i<playlist.length; i++) {
-        var match = /^sounds\/(.+).ogg$/.exec(playlist[i].filename);
+        var match = /\/sounds\/(.+).ogg$/.exec(playlist[i].filename);
         lines.push(match[1]);
     }
     if (current) {
-        var match = /^sounds\/(.+).ogg$/.exec(current.filename);
+        var match = /\/sounds\/(.+).ogg$/.exec(current.filename);
         user.sendMessage('Currently playing: ' + match[1])
     }
 

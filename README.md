@@ -1,5 +1,5 @@
-CoolDudesBot
-============
+Botman
+=======
 
 Formerly a [piepan](https://github.com/mathom/piepan) script to provide useful and fun features for your Mumble server.
 

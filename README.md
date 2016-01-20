@@ -46,7 +46,7 @@ Usage
 
 Simply run the bot script and any other extensions or configs you want:
 ```
-./bot.js --server 127.0.0.1 --name MyBot --command "@helloworld" --channel "my channel"
+./bot.js --server 127.0.0.1 --name MyBot --command "@helloworld" --channel "my channel" my_config.js my_extensions.js
 ```
 
 Type `!help` in the chat for a list of commands. You can whisper them to the bot as well,

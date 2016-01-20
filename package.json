@@ -18,6 +18,8 @@
         "mumble": "0.3.7",
         "vorbis": "0.1.1",
         "ogg": "1.2.1",
-        "striptags": "2.1.1"
+        "striptags": "2.1.1",
+        "ramda": "0.19.1",
+        "yargs": "3.32.0"
     }
 }

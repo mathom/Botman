@@ -41,6 +41,11 @@ Take a peek in `config_example.js` and set up a config file for yourself.
 
 Config options can also be specified on the command line. Run `./bot.js --help` to see some.
 
+Updating
+--------
+
+You can just `git pull` and re-run the `npm install` to get the latest code.
+
 Usage
 -----
 

@@ -13,20 +13,20 @@ Requirements
  * [youtube-dl](https://rg3.github.io/youtube-dl)
  * [beets](https://github.com/beetbox/beets)
 
-You can install all of these with the following on Ubuntu:
+You can install these with the following on Ubuntu:
 ```bash
-sudo apt-get install youtube-dl libav-tools normalize-audio beets libimage-exiftool-perl python-pip
+sudo apt-get install youtube-dl libav-tools normalize-audio libimage-exiftool-perl python-pip
 ```
 
-You'll also want to install nodeenv if you don't have it:
+You'll also want to install `nodeenv` and `beets` if you don't have them:
 ```bash
-sudo pip install nodeenv
+sudo pip install nodeenv beets
 ```
 
 Installation
 ------------
 
-Set up a nodeenv for 4.2.4 and activate it:
+Set up a `nodeenv` for 4.2.4 and activate it:
 ```bash
 nodeenv --node=4.2.4 --prebuilt botmanenv
 source ./env/bin/activate

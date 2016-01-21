@@ -213,8 +213,8 @@ commands.c_randplay = function(user, args) {
     spawn_cmd('beet', ['random', '-p'], (error, stdout) => {
         var match = /\/([A-Za-z0-9_-]+)\./.exec(stdout);
         if (match) {
-            var new_args = [match[1]];
-            commands.c_queue(user, new_args.concat(args));
+            var new_args = [match[1]].concat(args);
+            commands.c_queue(user, new_args);
         }
     });
 }
@@ -390,7 +390,7 @@ commands.c_queue = function(user, args) {
     }
     else {
         playlist.push(data);
-        if (!bot.output) {
+        if (!bot.isPlaying) {
             play_queue();
         }
     }

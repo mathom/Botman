@@ -19,7 +19,7 @@ if [ $? -eq 0 ]; then
     if [ -f $AUDIO_OUT.ogg ]; then
         NAME=$AUDIO_OUT.ogg
     fi
-    COMMAND="avconv -y -i $NAME -ac 1 -ar 44100 -codec:a libvorbis"
+    COMMAND="avconv -y -i $NAME -ac 1 -ar 48000 -codec:a libvorbis"
 
     if [ "$3" != "undefined" ]; then
         COMMAND="$COMMAND -ss $3"

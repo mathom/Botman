@@ -3,14 +3,10 @@
 "use strict";
 
 var mumble = require('mumble');
-var ogg = require('ogg');
-var vorbis = require('vorbis');
 var fs = require('fs');
 var striptags = require('striptags');
-var stream = require('stream');
-var util = require('util');
-var buffer = require('buffer');
 var R = require('ramda');
+var decoder = require('./decoder.js');
 
 var argv = require('yargs')
     .usage('Usage: $0 [options] [script1 script2 ...]')
@@ -30,6 +26,7 @@ class Bot {
         this.config = config;
         this.channel = null;
         this.audioInput = null;
+        this.playingStreams = [];
         this.volume = null;
     };
 
@@ -44,9 +41,27 @@ class Bot {
     stopPlaying() {
         if (this.audioInput !== null) {
             this.audioInput.close();
+            //R.reject(x => x == this.audioInput, this.playingStreams);
             this.audioInput = null;
         }
     };
+
+    playStream(stream, format) {
+        if (this.isPlaying) {
+            this.stopPlaying();
+        }
+        format.gain = this.volume;
+        this.audioInput = this.connection.inputStream(format);
+        //this.playingStreams.push(soundStream);
+        stream.pipe(this.audioInput);
+    };
+
+    setVolume(volume) {
+        this.volume =  0.1*Math.min(volume, 10);
+        if (this.isPlaying) {
+            this.audioInput.setGain(this.volume);
+        }
+    }
 }
 
 var bot = undefined;
@@ -56,6 +71,7 @@ var playlist = [];
 var current = null;
 var last_stopped = null;
 var current_volume;
+var rand_play = null;
 
 var default_config = {
     name: 'Botman',
@@ -200,6 +216,7 @@ commands.c_stop = function(user, args) {
             console.log('User', user.name, 'stopped', current.filename, 'at', at);
         }
         current = null;
+        play_queue();
     }
 }
 
@@ -208,15 +225,23 @@ commands.c_play = function(user, args) {
     commands.c_queue(user, args);
 }
 
-commands.h_randplay='Playing a random track from the database.'
-commands.c_randplay = function(user, args) {
+function queue_random(args) {
+    if (!args) {
+        args = [];
+    }
     spawn_cmd('beet', ['random', '-p'], (error, stdout) => {
         var match = /\/([A-Za-z0-9_-]+)\./.exec(stdout);
         if (match) {
             var new_args = [match[1]].concat(args);
-            commands.c_queue(user, new_args);
+            commands.c_queue(rand_play, new_args);
         }
     });
+}
+
+commands.h_randplay='Playing a random track from the database.'
+commands.c_randplay = function(user, args) {
+    rand_play = user;
+    queue_random(args);
 }
 
 function spawn_cmd(bin, args, callback) {
@@ -315,24 +340,12 @@ commands.c_resume = function(user, args) {
     }
 }
 
-function volume_clamp(val) {
-    return 0.1*Math.min(val, 10);
-}
-
-function set_volume(val) {
-    current_volume = volume_clamp(val);
-    if (current) {
-        current.volume = current_volume;
-    }
-    bot.volume = current_volume;
-}
-
 commands.h_volume='Set output volume to specified value.'
 commands.c_volume = function(user, args) {
     if (args[0])
-        set_volume(parseFloat(args[0]));
+        bot.setVolume(parseFloat(args[0]));
     else
-        user.sendMessage('Current volume: ' + current_volume);
+        user.sendMessage('Current volume: ' + bot.volume*10);
 }
 
 commands.h_volumedefault='Set default output volume to specified value.'
@@ -343,7 +356,10 @@ commands.c_volumedefault = function(user, args) {
 
 commands.h_queue='Queue a sound to play. See !playlist and !play.'
 commands.c_queue = function(user, args) {
-    var volume = volume_clamp(config.default_volume);
+    if (!user) {
+        return; // kind of crappy, but works for now
+    }
+    var volume = config.default_volume;
     var interrupt = false;
     var file_arg = args.shift();
     var filename = __dirname + '/sounds/' + file_arg + '.ogg';
@@ -355,7 +371,7 @@ commands.c_queue = function(user, args) {
             interrupt = true;
         }
         else if (file_arg != 'stream') {
-            volume = volume_clamp(parseFloat(arg));
+            volume = parseFloat(arg);
         }
         else {
             stream_url = arg;
@@ -370,7 +386,7 @@ commands.c_queue = function(user, args) {
             filename = config.mpd_stream;
         }
     }
-    else if (!file_exists(filename)) {
+    else if (!decoder.fileExists(filename)) {
         user.sendMessage("Sound file does not exist!");
         return;
     }
@@ -390,26 +406,25 @@ commands.c_queue = function(user, args) {
     }
     else {
         playlist.push(data);
-        if (!bot.isPlaying) {
-            play_queue();
-        }
+        play_queue();
     }
 }
 
 function play_queue() {
-    var data = playlist.shift();
-
-    if (data) {
-        current = data;
-        play_soundfile(data.filename, data.volume, data.user, data.at);
-    }
-    else {
-        current = null;
+    if (!bot.isPlaying) {
+        current = playlist.shift();
+        if (current) {
+            play_soundfile(current.filename, current.volume, current.user, current.at);
+        }
+        else if (rand_play) {
+            queue_random();
+        }
     }
 }
 
 commands.h_queueclear='Clear the play queue. See !queue.'
 commands.c_queueclear = function(user, args) {
+    rand_play = null;
     playlist = [];
     console.log(user.name, 'cleared playlist');
     commands.c_stop(user, args);
@@ -418,28 +433,9 @@ commands.c_queueclear = function(user, args) {
 commands.h_stream='Play the local MPD stream.'
 commands.c_stream = function(user, args) {
     console.log('playing MPD stream');
-    set_volume(config.default_volume);
+    bot.setVolume(config.default_volume);
     commands.c_queue(user, ['stream'].concat(args));
 }
-
-function float_to_int(options) {
-    stream.Transform.call(this, options);
-}
-util.inherits(float_to_int, stream.Transform);
-
-float_to_int.prototype._transform = function (chunk, enc, cb) {
-    var b = new buffer.Buffer(chunk.length/4 * 2);
-    for (var i=0, j=0; i<chunk.length; i+=4,j+=2) {
-        var f = chunk.readFloatLE(i);
-        f = f * 32768;
-        if (f > 32767) f = 32767;
-        if (f < -32768) f = -32768;
-
-        b.writeInt16LE(Math.floor(f), j);
-    }
-    this.push(b);
-    cb();
-};
 
 function play_soundfile(file, volume, user, at) {
     if (at === undefined) {
@@ -450,38 +446,16 @@ function play_soundfile(file, volume, user, at) {
         bot.stopPlaying();
     }
 
-    set_volume(volume);
-    var od = new ogg.Decoder();
-    var tform = new float_to_int();
-    od.on('stream', function(stream) {
-        var vd = new vorbis.Decoder();
-        vd.on('format', function(format) {
-            bot.audioInput = bot.connection.inputStream({
-                channels: format.channels,
-                sampleRate: format.sampleRate,
-                bitDepth: 16, //format.bitDepth,
-                signed: format.signed,
-                gain: volume
-            });
-            vd.pipe(tform).pipe(bot.audioInput);
-        });
-        vd.on('end', function() {
-            bot.stopPlaying();
-            play_queue();
-        });
-        vd.on('error', function(e) {
-            console.error(e);
-            bot.stopPlaying();
-        });
-
-        stream.pipe(vd);
-    });
-    od.on('error', function(e) {
-        console.error(e);
+    bot.setVolume(volume);
+    decoder.decodeFileOrStream(file, 0, (stream, fmt) => bot.playStream(stream, fmt), (error) => {
         bot.stopPlaying();
+        if (error) {
+            console.error(error);
+        }
+        else {
+            play_queue();
+        }
     });
-
-    fs.createReadStream(file).pipe(od);
 }
 
 commands.h_queuelist='Display play queue. See !queue.'
@@ -502,16 +476,6 @@ commands.c_queuelist = function(user, args) {
     else {
         user.sendMessage('Queue empty!');
     }
-}
-
-function file_exists(file) {
-    try {
-        fs.lstatSync(file);
-        return true;
-    } catch (e) {
-        console.error(e);
-    }
-    return false;
 }
 
 function randint (min, max) {

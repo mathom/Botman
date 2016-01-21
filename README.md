@@ -1,6 +1,8 @@
 Botman
 =======
 
+![Botman icon](img/icon.png "Botman icon")
+
 A simple bot to provide administration or multimedia on Mumble servers.
 
 Requirements

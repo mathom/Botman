@@ -411,7 +411,7 @@ function play_queue() {
 commands.h_queueclear='Clear the play queue. See !queue.'
 commands.c_queueclear = function(user, args) {
     playlist = [];
-        console.log(user.name, 'listing', directory, 'filtering by', filter);
+    console.log(user.name, 'cleared playlist');
     commands.c_stop(user, args);
 }
 

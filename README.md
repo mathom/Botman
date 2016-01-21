@@ -68,8 +68,8 @@ mkdir sounds
 Then, you'll want to configure `beet`. Run `beet config` and see if you have anything set up already. If not, here is an example
 configuration you can use (located in `~/.config/beets/config.yaml` by default):
 ```yaml
-directory: ~/CoolDudesBot/sounds
-library: ~/CoolDudesBot/music.blb
+directory: ~/Botman/sounds
+library: ~/Botman/music.blb
 
 import:
   copy: no
